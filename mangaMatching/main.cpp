@@ -1,7 +1,7 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
-#include "CmCurveEx.h"
+#include "VectorCurve.h"
 
 
 template<typename T>
@@ -19,18 +19,17 @@ int main(){
 	cv::cvtColor(img_read, img_gray, CV_BGR2GRAY);
 	img_gray.convertTo(img_gray_32f, CV_32FC1, 1.0 / 255);
 
-	std::vector<CmCurveEx::CEdge> edges;
-	CmCurveEx dEdge(img_gray_32f);
+	std::vector<std::vector<cv::Point>> edges;
+	VectorCurve dEdge(img_gray_32f);
 	dEdge.CalSecDer();
-	dEdge.Link();
-	edges = dEdge.GetEdges();
-	
+	edges = dEdge.Link();
+
 	printf("find %d curve done.\n", edges.size());
 	cv::Mat img_draw = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
 	for (size_t i = 0; i < edges.size(); ++i){
 		cv::Scalar color = cv::Scalar(rng.uniform(0, 221), rng.uniform(0, 221), rng.uniform(0, 221));
-		for (size_t j = 1; j < edges[i].pnts.size(); ++j){
-			cv::line(img_draw, edges[i].pnts[j - 1], edges[i].pnts[j], color);
+		for (size_t j = 1; j < edges[i].size(); ++j){
+			cv::line(img_draw, edges[i][j - 1], edges[i][j], color);
 		}
 	}
 	cv::imshow("draw", img_draw);

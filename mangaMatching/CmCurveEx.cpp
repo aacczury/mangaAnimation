@@ -269,7 +269,6 @@ const CmEdges& CmCurveEx::Link(int shortRemoveBound /* = 3 */)
 			m_vEdge.push_back(crtEdge);
 			crtEdge.index++;
 		}
-		break;
 	}
 
 	// Get edge information

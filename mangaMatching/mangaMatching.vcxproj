@@ -73,9 +73,11 @@
   <ItemGroup>
     <ClCompile Include="CmCurveEx.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="VectorCurve.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CmCurveEx.h" />
+    <ClInclude Include="VectorCurve.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

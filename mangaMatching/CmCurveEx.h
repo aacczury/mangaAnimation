@@ -100,7 +100,7 @@ public:
 
 	static void Demo(const Mat &img1u, bool isCartoon);
 
-private:
+protected:
 	const Mat &m_img1f; // Input image
 
 	Mat m_pDer1f;   // First or secondary derivatives. 32FC1
