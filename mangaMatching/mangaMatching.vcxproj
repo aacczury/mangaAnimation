@@ -73,11 +73,29 @@
   <ItemGroup>
     <ClCompile Include="CmCurveEx.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="mangaShow.cpp" />
+    <ClCompile Include="showLine.cpp" />
     <ClCompile Include="VectorCurve.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CmCurveEx.h" />
+    <ClInclude Include="mangaShow.h" />
+    <ClInclude Include="showLine.h">
+      <FileType>CppForm</FileType>
+    </ClInclude>
     <ClInclude Include="VectorCurve.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="showLine.resx">
+      <DependentUpon>showLine.h</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

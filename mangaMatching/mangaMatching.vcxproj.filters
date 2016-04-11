@@ -24,12 +24,24 @@
     <ClCompile Include="VectorCurve.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
+    <ClCompile Include="showLine.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="mangaShow.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CmCurveEx.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
     <ClInclude Include="VectorCurve.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="showLine.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+    <ClInclude Include="mangaShow.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
   </ItemGroup>
