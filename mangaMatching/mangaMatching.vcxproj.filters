@@ -30,6 +30,9 @@
     <ClCompile Include="mangaShow.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
+    <ClCompile Include="CurveDescriptor.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CmCurveEx.h">
@@ -44,5 +47,13 @@
     <ClInclude Include="mangaShow.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="CurveDescriptor.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="showLine.resx">
+      <Filter>資源檔</Filter>
+    </EmbeddedResource>
   </ItemGroup>
 </Project>

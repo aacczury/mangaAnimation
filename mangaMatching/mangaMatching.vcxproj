@@ -72,6 +72,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CmCurveEx.cpp" />
+    <ClCompile Include="CurveDescriptor.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mangaShow.cpp" />
     <ClCompile Include="showLine.cpp" />
@@ -79,6 +80,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CmCurveEx.h" />
+    <ClInclude Include="CurveDescriptor.h" />
     <ClInclude Include="mangaShow.h" />
     <ClInclude Include="showLine.h">
       <FileType>CppForm</FileType>

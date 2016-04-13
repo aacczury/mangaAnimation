@@ -82,6 +82,45 @@ void mangaShow::link_adjacent(){ // maybe need speed up
 	return;
 }
 
+void mangaShow::caculate_curve(){
+	std::vector<cv::Point2d> curve;
+	for (unsigned int i = 0; i < curves[0].size(); ++i)
+		curve.push_back(curves[0][i]);
+
+	CurveDescriptor cd = CurveDescriptor(curve, curve.size() / 5, 3.0, true);
+	curve = cd.get_smooth_curve();
+	std::vector<double> curvature = cd.get_curvature();
+	std::vector<double> curvature_integration = cd.get_curvature_integration();
+
+	//double sigma = 3.0;
+	//int M = round((10.0 * sigma + 1.0) / 2.0) * 2 - 1;
+	//assert(M % 2 == 1); //M is an odd number
+	//
+	//vector<double> curve_x, curve_y;
+	//PolyLineSplit(curve, curve_x, curve_y);
+	//vector<double> sample_x, sample_y;
+	//ResampleCurve(curve_x, curve_y, sample_x, sample_y, curve.size() / 5, true);
+	//std::vector<double> g, dg, ddg;
+	//vector<double> curvature;
+	//vector<double> smooth_x, smooth_y;
+	//ComputeCurveCSS(sample_x, sample_y, curvature, smooth_x, smooth_y, sigma, true);
+	//PolyLineMerge(curve, smooth_x, smooth_y);
+
+	for (unsigned int i = 1; i < curve.size(); ++i){
+		cv::line(img_show, cv::Point(round(curve[i].x), round(curve[i].y)), cv::Point(round(curve[i - 1].x), round(curve[i - 1].y)), cv::Scalar(0, 0, 255));
+	}
+	cv::resize(img_show, img_show_scale, cv::Size(img_show.cols * 3, img_show.rows * 3));
+
+	vector<cv::Point2d> data;
+	data.resize(curve.size());
+	for (unsigned int i = 0; i < curve.size() - 1; ++i){
+		if (i == 0) data[i] = cv::Point2d(0, abs(curvature_integration[i]));
+		else data[i] = cv::Point2d(data[i - 1].x + cv::norm(curve[i] - curve[i - 1]), abs(curvature_integration[i]));
+		printf("%lf\n", curvature_integration[i]);
+	}
+	draw_plot_graph(data);
+}
+
 void mangaShow::rng_curves_color(){
 	if (curves_color.size() != curves.size())
 		curves_color.resize(curves.size());
@@ -155,6 +194,7 @@ void mangaShow::draw_topol(){
 			cv::line(img_show, p, q, draw_color);
 	}
 	cv::resize(img_show, img_show_scale, cv::Size(img_show.cols * scale, img_show.rows * scale));
+	cv::imwrite("results/topology.png", img_show_scale);
 	return;
 }
 
@@ -203,17 +243,115 @@ T &mangaShow::ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c){
 	return ((T *)m.data)[(p.y * m.cols + p.x) * m.channels() + c];
 }
 
-void mangaShow::compute_curvature(std::vector<cv::Point> curve){
+void mangaShow::integral_curvature_curve(std::vector<cv::Point2d> curve){
+	// O O O O ... O O O O curve
+	// X X O O ... O O X X curvature
+	// X X X O ... O X X X curvature_integration
 	std::vector<double> curvature;
-	for (unsigned int i = 1; i < curve.size() - 2; ++i){
-		double dx1 = curve[i].x - curve[i - 1].x;
-		double dx2 = curve[i + 1].x - curve[i].x;
-		double dy1 = curve[i].y - curve[i - 1].y;
-		double dy2 = curve[i + 1].y - curve[i].y;
-		double ddx = dx2 - dx1;
-		double ddy = dy2 - dy1;
+	std::vector<double> curvature_integration;
+	curvature.resize(curve.size());
+	for (unsigned int i = 6; i < curve.size() - 6; ++i){
+		//double dx1 = curve[i].x - curve[i - 1].x;
+		//double dx2 = curve[i + 1].x - curve[i].x;
+		//double dy1 = curve[i].y - curve[i - 1].y;
+		//double dy2 = curve[i + 1].y - curve[i].y;
+		//double ddx = dx2 - dx1;
+		//double ddy = dy2 - dy1;
+		//
+		//if (pow(dx1 * dx1 + dy1 * dy1, 1.5) == 0) curvature.push_back(0);
+		//else curvature.push_back((dx1 * ddy - dy1 * ddx) / pow(dx1 * dx1 + dy1 * dy1, 1.5));
 
-		if (pow(dx1 * dx1 + dy1 * dy1, 1.5) == 0) curvature.push_back(0);
-		else curvature.push_back((dx1 * ddy - dy1 * ddx) / pow(dx1 * dx1 + dy1 * dy1, 1.5));
+		//double a = cv::norm(curve[i] - curve[i - 2]);
+		//double b = cv::norm(curve[i + 2] - curve[i]);
+		//double c = cv::norm(curve[i + 2] - curve[i - 2]);
+		//double R = circumscribed_circle_radius(a, b, c);
+		//if(R == 0) curvature.push_back(0);
+		//else curvature.push_back(1 / R);
+		
+		cv::Point2d p1 = curve[i - 6];
+		cv::Point2d p2 = curve[i - 3];
+		cv::Point2d p3 = curve[i - 0];
+		cv::Point2d p4 = curve[i + 3];
+		cv::Point2d p5 = curve[i + 6];
+
+		double b1 = (p5.x + p1.x + 2 * p4.x + 2 * p2.x - 6 * p3.x) / 12;
+		double b2 = (p5.y + p1.y + 2 * p4.y + 2 * p2.y - 6 * p3.y) / 12;
+		double c1 = (p5.x - p1.x + 4 * p4.x + 4 * p2.x) / 12;
+		double c2 = (p5.y - p1.y + 4 * p4.y + 4 * p2.y) / 12;
+		if (abs(pow(c1 * c1 + c2 * c2, 1.5)) < 0.000001) curvature[i] = 0;
+		else curvature[i] = abs(2 * (c1 * b2 - c2 * b1) / pow(c1 * c1 + c2 * c2, 1.5)) * 100;
+
+		printf("curvature: %lf\n", curvature[i]);
+
+
+		//double ds = cv::norm(curve[i] - curve[i - 1]);
+		//curvature_integration.push_back((curvature[i] + curvature[i - 1]) * ds / 2);
+		//if (i == 2 || i == curve.size() - 3){
+		//	curvature_integration.push_back(curvature_integration[curvature_integration.size() - 1]);
+		//	curvature_integration.push_back(curvature_integration[curvature_integration.size() - 1]);
+		//}
 	}
+
+	std::vector<cv::Point2d> data;
+	for (unsigned int i = 0; i < curve.size(); ++i){
+		if (!i) data.push_back(cv::Point2d(0, curvature[i]));
+		else data.push_back(cv::Point2d(data[data.size() - 1].x + cv::norm(curve[i] - curve[i - 1]), curvature[i]));
+	}
+	draw_plot_graph(data);
+}
+
+unsigned int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<double> b){
+	double max_v = 0;
+	unsigned int offset = 0;
+
+	double a_avg = 0;
+	for (unsigned int i = 0; i < a.size(); ++i)
+		a_avg += a[i];
+	a_avg /= a.size();
+
+	for (unsigned int i = 0; i < b.size() - a.size(); ++i){
+		double b_avg = 0;
+		for (unsigned int j = 0; j < a.size(); ++j)
+			b_avg += b[i + j];
+		b_avg /= a.size();
+
+		double FT = 0, FF = 0, TT = 0;
+		for (unsigned int j = 0; j < a.size(); ++j){
+			double F = a[j] - a_avg;
+			double T = b[i + j] - b_avg;
+			FT += F * T;
+			FF += F * F;
+			TT += T * T;
+		}
+		double V = FT / sqrt(FF * TT);
+		if (V > max_v){
+			max_v = V;
+			offset = i;
+		}
+	}
+
+	return offset;
+}
+
+bool p_x_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.x < b.x; }
+bool p_y_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.y < b.y; }
+void mangaShow::draw_plot_graph(std::vector<cv::Point2d> data){
+	int width = 1200, height = 900, padding = 50;
+	cv::Mat plot_show = cv::Mat(height, width, CV_8UC3);
+	std::sort(data.begin(), data.end(), p_x_cmp);
+	std::vector<cv::Point2d>::iterator max_y = std::max_element(data.begin(), data.end(), p_y_cmp);
+	std::vector<cv::Point2d>::iterator min_y = std::min_element(data.begin(), data.end(), p_y_cmp);
+	
+	double norm_x = data[data.size() - 1].x - data[0].x, norm_y = 0.202392 - (*min_y).y;
+	int inner_w = width - padding * 2, inner_h = height - padding * 2;
+	for (unsigned int i = 1; i < data.size(); ++i){
+		cv::line(plot_show,
+			cv::Point(padding + round((data[i - 1].x - data[0].x) / norm_x * inner_w), padding + inner_h - round((data[i - 1].y - (*min_y).y) / norm_y * inner_h)),
+			cv::Point(padding + round((data[i].x - data[0].x) / norm_x * inner_w), padding + inner_h - round((data[i].y - (*min_y).y) / norm_y * inner_h)),
+			cv::Scalar(200, 200, 0),
+			2);
+	}
+	printf("max_y: %lf, min_y: %lf\n", (*max_y).y, (*min_y).y);
+	cv::imshow("plot", plot_show);
+	cv::imwrite("results/plot.png", plot_show);
 }

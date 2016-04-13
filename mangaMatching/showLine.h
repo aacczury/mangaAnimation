@@ -117,6 +117,7 @@ namespace mangaMatching {
 							 ms.topol_curves();
 							 ms.link_adjacent();
 							 ms.draw_topol();
+							 ms.caculate_curve();
 
 							 QueryPerformanceCounter(&end_t);
 							 std::cout << ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart << std::endl;

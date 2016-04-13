@@ -14,10 +14,11 @@
 #include <Windows.h>
 
 #include "VectorCurve.h"
+#include "CurveDescriptor.h"
 
 using namespace System::Drawing;
 
-namespace std{
+namespace std{ // cv::Point unordered_set and unordered_map need a hash function
 	template <> struct hash<cv::Point>{
 		size_t operator()(cv::Point const &p) const{
 			return 53 + std::hash<int>()(p.x) * 53 + std::hash<int>()(p.y);
@@ -33,6 +34,7 @@ public:
 	void remove_dump_by_ROI(unsigned short thickness = 2);
 	void topol_curves();
 	void link_adjacent();
+	void caculate_curve();
 
 	void rng_curves_color();
 	void set_curves_drawable(int index = -1, bool is_draw = true);
@@ -70,7 +72,21 @@ private:
 	// type:Mat type ex: uchar(0), p: Point, c: channel
 	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0);
 
-	void compute_curvature(std::vector<cv::Point>);
+	double heron_formula(double a, double b, double c){ // side length
+		double s = (a + b + c) / 2;
+		return sqrt(s * (s - a) * (s - b) * (s - c));
+	}
+	double circumscribed_circle_radius(double a, double b, double c){
+		double S = heron_formula(a, b, c);
+		if (S == 0) return 0;
+		return a * b * c / 4 / S;
+	}
+
+	void integral_curvature_curve(std::vector<cv::Point2d> curve);
+
+	void resampling_curve(std::vector<double> curvature_integration);
+	unsigned int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
+	void draw_plot_graph(std::vector<cv::Point2d> data);
 };
 
 #endif
