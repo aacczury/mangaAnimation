@@ -73,7 +73,6 @@
   <ItemGroup>
     <ClCompile Include="CmCurveEx.cpp" />
     <ClCompile Include="CurveDescriptor.cpp" />
-    <ClCompile Include="main.cpp" />
     <ClCompile Include="mangaShow.cpp" />
     <ClCompile Include="showLine.cpp" />
     <ClCompile Include="VectorCurve.cpp" />

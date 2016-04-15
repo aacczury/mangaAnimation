@@ -64,41 +64,245 @@ float const static PI_QUARTER = PI_FLOAT * 0.25f;
 float const static PI_EIGHTH = PI_FLOAT * 0.125f;
 
 
-std::vector<std::vector<cv::Point>> VectorCurve::Link(int shortRemoveBound /* = 3 */){
+void VectorCurve::Link(int shortRemoveBound /* = 3 */){
 	CV_Assert(m_pDer1f.data != NULL && m_pLabel1i.data != NULL);
 
 	sort(m_StartPnt.begin(), m_StartPnt.end(), linePointGreater);
 
 	m_pNext1i = -1;
-	std::vector<std::vector<cv::Point>> edges;
+	curves.clear();
 	for (vector<PntImp>::iterator it = m_StartPnt.begin(); it != m_StartPnt.end(); it++)
 	{
 		Point pnt = it->second;
 		if (m_pLabel1i.at<int>(pnt) != IND_NMS)
 			continue;
-		m_pLabel1i.at<int>(pnt) = edges.size();
-		std::vector<cv::Point> edge;
-		edge.push_back(pnt);
+		m_pLabel1i.at<int>(pnt) = curves.size();
+		std::vector<cv::Point> curve;
+		curve.push_back(pnt);
 
 		std::vector<cv::Point> forward_edge;
-		findEdge(pnt, forward_edge, FALSE, edges.size());
+		findEdge(pnt, forward_edge, FALSE, curves.size());
 		std::vector<cv::Point> backward_edge;
-		findEdge(pnt, backward_edge, TRUE, edges.size());
+		findEdge(pnt, backward_edge, TRUE, curves.size());
 		std::reverse(backward_edge.begin(), backward_edge.end());
 
-		edge.insert(edge.begin(), backward_edge.begin(), backward_edge.end());
-		edge.insert(edge.end(), forward_edge.begin(), forward_edge.end());
+		curve.insert(curve.begin(), backward_edge.begin(), backward_edge.end());
+		curve.insert(curve.end(), forward_edge.begin(), forward_edge.end());
 
-		if (edge.size() <= shortRemoveBound) {
-			for (size_t i = 0; i < edge.size(); ++i)
-				m_pLabel1i.at<int>(edge[i]) = IND_SR;
+		if (curve.size() <= shortRemoveBound) {
+			for (size_t i = 0; i < curve.size(); ++i)
+				m_pLabel1i.at<int>(curve[i]) = IND_SR;
 		}
 		else{
-			edges.push_back(edge);
+			curves.push_back(curve);
 		}
 	}
+	printf("=> Finding %d curve done.\n", curves.size());
+	return;
+}
 
-	return edges;
+
+bool curve_size_cmp(std::vector<cv::Point> &a, std::vector<cv::Point> &b){
+	return a.size() > b.size();
+}
+void VectorCurve::remove_duplication(unsigned int width, unsigned height, unsigned short thickness){
+	std::sort(curves.begin(), curves.end(), curve_size_cmp);
+	std::vector<bool> is_remove;
+	is_remove.resize(curves.size());
+	for (unsigned int i = 0; i < curves.size(); ++i){
+		cv::Mat ROI = cv::Mat(height, width, CV_8UC1, cv::Scalar(0));
+		for (unsigned int j = 1; j < curves[i].size(); ++j)
+			cv::line(ROI, curves[i][j - 1], curves[i][j], cv::Scalar(1), thickness);
+
+		for (unsigned int j = i + 1; j < curves.size(); ++j){
+
+			unsigned int useless_pnt = 0;
+			for (unsigned int k = 0; k < curves[j].size(); ++k){
+				if (ref_Mat_val(ROI, uchar(0), curves[j][k]))
+					useless_pnt++;
+			}
+
+			if (useless_pnt == curves[j].size())
+				is_remove[j] = true;
+		}
+	}
+	unsigned int curr_curves_num = curves.size();
+	remove_curves(is_remove);
+	printf("=> Removing %d curve done.\n", curr_curves_num - curves.size());
+	return;
+}
+
+void VectorCurve::link_curves(){
+	for (unsigned int i = 0; i < curves.size(); ++i){
+		curves_pnts.insert(curves[i][0]);
+		for (unsigned int j = 1; j < curves[i].size(); ++j){
+			curves_pnts.insert(curves[i][j]);
+			topol[curves[i][j - 1]].insert(curves[i][j]);
+			topol[curves[i][j]].insert(curves[i][j - 1]);
+		}
+	}
+	printf("=> Link curves done.\n");
+	return;
+}
+
+void VectorCurve::link_adjacent(){ // maybe need speed up
+	for (std::unordered_set<cv::Point>::iterator pit = curves_pnts.begin(); pit != curves_pnts.end(); ++pit){
+		std::unordered_set<cv::Point>::iterator qit = pit;
+		for (++qit; qit != curves_pnts.end(); ++qit){
+			cv::Point dis = *pit - *qit;
+			dis = cv::Point(abs(dis.x), abs(dis.y));
+			if (dis == cv::Point(1, 0) || dis == cv::Point(1, 1) || dis == cv::Point(0, 1)){
+				topol[*pit].insert(*qit);
+				topol[*qit].insert(*pit);
+			}
+		}
+	}
+	printf("=> Link adjacent done.\n");
+	return;
+}
+
+void VectorCurve::relink_4_degree(){
+	for (const cv::Point &p : curves_pnts){
+		if (topol[p].size() == 4){
+			unsigned short is_through[8] = { 0 };
+			// 5 6 7
+			// 4   0
+			// 3 2 1
+			int line_case = 0;
+			bool other_straight_line = false;
+			if (topol[p].find(p + DIRECTION8[1]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[5]) != topol[p].end()){
+				is_through[1] += 2, is_through[5] += 2;
+				line_case += 1;
+			}
+			if (topol[p].find(p + DIRECTION8[2]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[6]) != topol[p].end()){
+				is_through[2] += 2, is_through[6] += 2;
+				line_case += 2;
+			}
+			if (topol[p].find(p + DIRECTION8[3]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[7]) != topol[p].end()){
+				is_through[3] += 2, is_through[7] += 2;
+				line_case += 4;
+			}
+			if (topol[p].find(p + DIRECTION8[4]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[0]) != topol[p].end()){
+				is_through[4] += 2, is_through[0] += 2;
+				line_case += 8;
+			}
+
+			if (topol[p].find(p + DIRECTION8[1]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[2]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[3]) != topol[p].end()){
+				is_through[1] ++, is_through[2] ++, is_through[3] ++;
+				other_straight_line = true;
+			}
+			else if (topol[p].find(p + DIRECTION8[3]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[4]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[5]) != topol[p].end()){
+				is_through[3] ++, is_through[4] ++, is_through[5] ++;
+				other_straight_line = true;
+			}
+			else if (topol[p].find(p + DIRECTION8[5]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[6]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[7]) != topol[p].end()){
+				is_through[5] ++, is_through[6] ++, is_through[7] ++;
+				other_straight_line = true;
+			}
+			else if (topol[p].find(p + DIRECTION8[7]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[0]) != topol[p].end() &&
+				topol[p].find(p + DIRECTION8[1]) != topol[p].end()){
+				is_through[7] ++, is_through[0] ++, is_through[1] ++;
+				other_straight_line = true;
+			}
+
+			if (line_case > 0 && other_straight_line){
+				for (unsigned short i = 0; i < 8; ++i){
+					if (is_through[i] == 1) topol[p + DIRECTION8[i]].erase(p);
+				}
+				switch (line_case)
+				{
+				case 1: topol[p].clear(); topol[p].insert(p + DIRECTION8[1]); topol[p].insert(p + DIRECTION8[5]); break;
+				case 2: topol[p].clear(); topol[p].insert(p + DIRECTION8[2]); topol[p].insert(p + DIRECTION8[6]); break;
+				case 4: topol[p].clear(); topol[p].insert(p + DIRECTION8[3]); topol[p].insert(p + DIRECTION8[7]); break;
+				case 8: topol[p].clear(); topol[p].insert(p + DIRECTION8[4]); topol[p].insert(p + DIRECTION8[0]); break;
+				}
+			}
+			else{
+				printf("==> What a terrible 4 degree !!\n");
+				if (topol[p].find(p + DIRECTION8[5]) != topol[p].end()) printf("O"); else printf("X");
+				if (topol[p].find(p + DIRECTION8[6]) != topol[p].end()) printf("O"); else printf("X");
+				if (topol[p].find(p + DIRECTION8[7]) != topol[p].end()) printf("O"); else printf("X");
+				printf("\n");
+				if (topol[p].find(p + DIRECTION8[4]) != topol[p].end()) printf("O"); else printf("X");
+				printf("O");
+				if (topol[p].find(p + DIRECTION8[0]) != topol[p].end()) printf("O"); else printf("X");
+				printf("\n");
+				if (topol[p].find(p + DIRECTION8[3]) != topol[p].end()) printf("O"); else printf("X");
+				if (topol[p].find(p + DIRECTION8[2]) != topol[p].end()) printf("O"); else printf("X");
+				if (topol[p].find(p + DIRECTION8[1]) != topol[p].end()) printf("O"); else printf("X");
+				printf("\n");
+			}
+		}
+	}
+	printf("=> Relinking 4 degree done.\n");
+	return;
+}
+
+void VectorCurve::relink_3_degree(){
+	for (const cv::Point &p : curves_pnts){
+		if (topol[p].size() == 3){
+			std::vector<cv::Point> ab, c;
+			for (const cv::Point &q : topol[p]){
+				cv::Point dis = q - p;
+				dis = cv::Point(abs(dis.x), abs(dis.y));
+				if ((dis.x + dis.y) == 1 && topol[q].size() == 3) ab.push_back(q);
+				else c.push_back(q);
+			}
+			if (ab.size() == 2 && c.size() == 1){
+				topol[ab[0]].erase(c[0]), topol[ab[0]].erase(ab[1]);
+				topol[ab[1]].erase(c[0]), topol[ab[1]].erase(ab[0]);
+			}
+		}
+	}
+	for (const cv::Point &p : curves_pnts){
+		if (topol[p].size() == 3){
+			std::vector<cv::Point> ab, c;
+			for (const cv::Point &q : topol[p]){
+				if (topol[q].size() == 3) ab.push_back(q);
+				else c.push_back(q);
+			}
+			if (ab.size() == 2 && c.size() == 1){
+				topol[ab[0]].erase(c[0]), topol[ab[0]].erase(ab[1]);
+				topol[ab[1]].erase(c[0]), topol[ab[1]].erase(ab[0]);
+			}
+		}
+	}
+	printf("=> Relinking 3 degree done.\n");
+	return;
+}
+
+void VectorCurve::relink_curves(){
+	for (const cv::Point &p : curves_pnts){
+		if (topol[p].size() > 2){
+			junction_pnts.insert(p);
+			printf("%d: (%d, %d)\n", topol[p].size(), p.x, p.y);
+		}
+		else if (topol[p].size() == 1)
+			end_pnts.insert(p);
+	}
+}
+
+std::vector<std::vector<cv::Point>> VectorCurve::get_curves(){
+	return curves;
+}
+
+std::unordered_set<cv::Point> VectorCurve::get_curves_pnts(){
+	return curves_pnts;
+}
+
+std::unordered_map<cv::Point, unordered_set<cv::Point>> VectorCurve::get_topol(){
+	return topol;
 }
 
 void VectorCurve::findEdge(Point seed, std::vector<cv::Point> &edge, bool isBackWard, int index){
@@ -265,4 +469,13 @@ endPoint VectorCurve::jumpNext(Point &pnt, float &ornt, std::vector<cv::Point> &
 		return endPoint(1);
 	}
 	return endPoint(0);
+}
+
+void VectorCurve::remove_curves(std::vector<bool> is_remove){
+	assert(is_remove.size() == curves.size());
+	std::vector<std::vector<cv::Point>> tmp_curves = curves;
+	curves.clear();
+	for (unsigned int i = 0; i < tmp_curves.size(); ++i)
+		if (!is_remove[i]) curves.push_back(tmp_curves[i]);
+	return;
 }

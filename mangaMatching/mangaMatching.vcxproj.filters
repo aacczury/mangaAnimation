@@ -18,9 +18,6 @@
     <ClCompile Include="CmCurveEx.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>原始程式檔</Filter>
-    </ClCompile>
     <ClCompile Include="VectorCurve.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>

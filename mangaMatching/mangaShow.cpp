@@ -1,84 +1,79 @@
 #include "mangaShow.h"
 
+mangaShow::mangaShow(){
+	img_read = img_show = canvas = cv::Mat();
+	curves.clear();
+	curves_color.clear();
+	curves_drawable.clear();
+	graph_pnts.clear();
+	graph.clear();
+}
 
-mangaShow::mangaShow(char *filename){
+void mangaShow::read_img(char *filename){
 	img_read = cv::imread(filename, CV_LOAD_IMAGE_COLOR);
 	// need exception handling
 	img_show = img_read.clone();
-	cv::resize(img_show, img_show_scale, cv::Size(img_show.cols * scale, img_show.rows * scale));
+	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
+
+	QueryPerformanceFrequency(&freq);
+
+	printf("=> Reading image done.\n");
 }
 
-void mangaShow::vector_curves(){
-	cv::Mat img_gray, img_gray_32f;
-	cv::cvtColor(img_read, img_gray, CV_BGR2GRAY);
-	img_gray.convertTo(img_gray_32f, CV_32FC1, 1.0 / 255);
+void mangaShow::read_graph(char *filename){
+	FILE *graph_file = fopen(filename, "r");
+	std::vector<cv::Point2d> graph_pnts_vector;
+	graph_pnts_vector.clear(), graph_pnts.clear(), graph.clear();
 
-	VectorCurve vc(img_gray_32f);
-	vc.CalSecDer();
-	curves = vc.Link();
+	unsigned int pnts_size;
+	fscanf(graph_file, "%u\n", &pnts_size);
+	for (unsigned int i = 0; i < pnts_size; ++i){
+		cv::Point2d p;
+		fscanf(graph_file, "V %lf %lf\n", &p.x, &p.y);
+		graph_pnts_vector.push_back(p);
+		graph_pnts.insert(p);
+	}
 
-	set_curves_drawable();
-	printf("=> Finding %d curve done.\n", curves.size());
+	unsigned int edges_size;
+	fscanf(graph_file, "%u\n", &edges_size);
+	for (unsigned int i = 0; i < edges_size; ++i){
+		unsigned int p, q;
+		fscanf(graph_file, "S %u %u\n", &p, &q);
+		graph[graph_pnts_vector[p]].insert(graph_pnts_vector[q]);
+		graph[graph_pnts_vector[q]].insert(graph_pnts_vector[p]);
+	}
+
+	printf("=> Reading graph done.\n");
 	return;
 }
 
-
-bool cmp_curve_size(std::vector<cv::Point> &a, std::vector<cv::Point> &b){
-	return a.size() > b.size();
-}
-void mangaShow::remove_dump_by_ROI(unsigned short thickness){
-	std::sort(curves.begin(), curves.end(), cmp_curve_size);
-
-	for (unsigned int i = 0; i < curves.size(); ++i){
-		if (!curves_drawable[i]) continue;
-
-		cv::Mat ROI = cv::Mat(img_read.rows, img_read.cols, CV_8UC1, cv::Scalar(0));
-		for (unsigned int j = 1; j < curves[i].size(); ++j)
-			cv::line(ROI, curves[i][j - 1], curves[i][j], cv::Scalar(1), thickness);
-
-		for (unsigned int j = i + 1; j < curves.size(); ++j){
-			if (!curves_drawable[j]) continue;
-
-			unsigned int useless_pnt = 0;
-			for (unsigned int k = 0; k < curves[j].size(); ++k){
-				if (ref_Mat_val(ROI, uchar(0), curves[j][k]))
-					useless_pnt++;
-			}
-
-			if (useless_pnt == curves[j].size())
-				set_curves_drawable(j, false);
+void mangaShow::build_curves(){
+	std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> pnts_used_pnts;
+	for (const cv::Point2d &p : graph_pnts){
+		if (graph[p].size() == 1){
+			end_pnts.insert(p);
+			pnts_used_pnts[p] = graph[p];
+		}
+		if (graph[p].size() > 2){
+			junction_pnts.insert(p);
+			pnts_used_pnts[p] = graph[p];
 		}
 	}
-	return;
-}
+	
+	for (const cv::Point2d &p : end_pnts){
+		cv::Point2d q = *(graph[p].begin());
+		if (pnts_used_pnts[p].find(q) == pnts_used_pnts[p].end()) continue;
+		curves.push_back(link_curve(p, q, pnts_used_pnts));
+	}
 
-void mangaShow::topol_curves(){
-	for (unsigned int i = 0; i < curves.size(); ++i){
-		if (!curves_drawable[i]) continue;
-
-		curves_pnts.insert(curves[i][0]);
-		for (unsigned int j = 1; j < curves[i].size(); ++j){
-			curves_pnts.insert(curves[i][j]);
-			topol[curves[i][j - 1]].insert(curves[i][j]);
-			topol[curves[i][j]].insert(curves[i][j - 1]);
+	for (const cv::Point2d &p : junction_pnts){
+		for (const cv::Point2d &q : graph[p]){
+			if (pnts_used_pnts[p].find(q) == pnts_used_pnts[p].end()) continue;
+			curves.push_back(link_curve(p, q, pnts_used_pnts));
 		}
 	}
-	return;
-}
 
-void mangaShow::link_adjacent(){ // maybe need speed up
-	for (std::unordered_set<cv::Point>::iterator pit = curves_pnts.begin(); pit != curves_pnts.end(); ++pit){
-		std::unordered_set<cv::Point>::iterator qit = pit;
-		qit++;
-		for (; qit != curves_pnts.end(); ++qit){
-			cv::Point dis = *pit - *qit;
-			dis = cv::Point(abs(dis.x), abs(dis.y));
-			if ((dis.x + dis.y) > 0 && (dis.x + dis.y) <= 2 && dis.x <= 1 && dis.y <= 1){
-				topol[*pit].insert(*qit);
-				topol[*qit].insert(*pit);
-			}
-		}
-	}
+	printf("=> Building curves done\n");
 	return;
 }
 
@@ -92,26 +87,12 @@ void mangaShow::caculate_curve(){
 	std::vector<double> curvature = cd.get_curvature();
 	std::vector<double> curvature_integration = cd.get_curvature_integration();
 
-	//double sigma = 3.0;
-	//int M = round((10.0 * sigma + 1.0) / 2.0) * 2 - 1;
-	//assert(M % 2 == 1); //M is an odd number
-	//
-	//vector<double> curve_x, curve_y;
-	//PolyLineSplit(curve, curve_x, curve_y);
-	//vector<double> sample_x, sample_y;
-	//ResampleCurve(curve_x, curve_y, sample_x, sample_y, curve.size() / 5, true);
-	//std::vector<double> g, dg, ddg;
-	//vector<double> curvature;
-	//vector<double> smooth_x, smooth_y;
-	//ComputeCurveCSS(sample_x, sample_y, curvature, smooth_x, smooth_y, sigma, true);
-	//PolyLineMerge(curve, smooth_x, smooth_y);
-
 	for (unsigned int i = 1; i < curve.size(); ++i){
 		cv::line(img_show, cv::Point(round(curve[i].x), round(curve[i].y)), cv::Point(round(curve[i - 1].x), round(curve[i - 1].y)), cv::Scalar(0, 0, 255));
 	}
-	cv::resize(img_show, img_show_scale, cv::Size(img_show.cols * 3, img_show.rows * 3));
+	cv::resize(img_show, canvas, cv::Size(img_show.cols * 3, img_show.rows * 3));
 
-	vector<cv::Point2d> data;
+	std::vector<cv::Point2d> data;
 	data.resize(curve.size());
 	for (unsigned int i = 0; i < curve.size() - 1; ++i){
 		if (i == 0) data[i] = cv::Point2d(0, abs(curvature_integration[i]));
@@ -119,6 +100,37 @@ void mangaShow::caculate_curve(){
 		printf("%lf\n", curvature_integration[i]);
 	}
 	draw_plot_graph(data);
+}
+
+void mangaShow::draw_graph(){
+	img_show = img_read.clone();
+	
+	int ps = max(img_read.rows, img_read.cols);
+	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
+	for (const cv::Point2d &p : graph_pnts){
+		for (const cv::Point2d &q : graph[p]){
+			cv::line(img_show, cv::Point2d(p.x * ps, p.y * -ps) + ds, cv::Point2d(q.x * ps, q.y * -ps) + ds, green);
+		}
+	}
+
+	for (const cv::Point2d &p : graph_pnts){
+		cv::Scalar draw_color;
+		switch (graph[p].size()){
+			case 1: draw_color = red; break;
+			case 2: draw_color = purple; break;
+			case 3: draw_color = blue; break;
+			case 4: draw_color = yellow; break;
+			default: draw_color = cyan; break;
+		}
+
+		cv::circle(img_show, cv::Point2d(p.x * ps, p.y * -ps) + ds, 1, draw_color, CV_FILLED);
+	}
+
+	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
+	cv::imwrite("results/topology.png", canvas);
+
+	printf("=> Drawing graph done.\n");
+	return;
 }
 
 void mangaShow::rng_curves_color(){
@@ -148,54 +160,31 @@ void mangaShow::draw_curves(){
 	if (curves_color.size() != curves.size()) rng_curves_color();
 	if (curves_drawable.size() != curves.size()) set_curves_drawable();
 
+	int ps = max(img_read.rows, img_read.cols);
+	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 	img_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
 	for (unsigned int i = 0; i < curves.size(); ++i)
 		for (unsigned int j = 1; j < curves[i].size(); ++j)
 			if (curves_drawable[i])
-				cv::line(img_show, curves[i][j - 1], curves[i][j], curves_color[i]);
-	cv::resize(img_show, img_show_scale, cv::Size(img_show.cols * scale, img_show.rows * scale));
+				cv::line(img_show,
+				cv::Point2d(curves[i][j - 1].x * ps, curves[i][j - 1].y * -ps) + ds,
+				cv::Point2d(curves[i][j].x * ps, curves[i][j].y * -ps) + ds,
+				curves_color[i]);
+	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
+	cv::imwrite("results/curves.png", canvas);
+
+	printf("=> Drawing curves done.\n");
 	return;
 }
 
-void mangaShow::draw_topol(){
-	img_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
+bool mangaShow::is_read_img(){
+	if (img_read.dims) return true;
+	return false;
+}
 
-	typedef struct p_degree{
-		p_degree(cv::Point _p, unsigned int _d) :p(_p), degree(_d){};
-		cv::Point p;
-		unsigned int degree;
-	} p_degree;
-	
-	struct p_degree_cmp{
-		bool operator()(p_degree const &a, p_degree const &b){
-			return a.degree < b.degree;
-		}
-	};
-
-	std::vector<p_degree> pnts_degree;
-	for (const cv::Point &p : curves_pnts)
-		pnts_degree.push_back(p_degree(p, topol[p].size()));
-	std::sort(pnts_degree.begin(), pnts_degree.end(), p_degree_cmp());
-
-	for (const p_degree &pnt_degree : pnts_degree){
-		cv::Point p = pnt_degree.p;
-		//printf("size: %d\n", pnt_degree.degree);
-		cv::Scalar draw_color;
-		switch (topol[p].size()){
-			case 1: case 2: draw_color = gray; break;
-			case 3: draw_color = blue; break;
-			case 4: draw_color = cyan; break;
-			case 5: draw_color = green; break;
-			case 6: draw_color = yellow; break;
-			default: draw_color = red; break;
-		}
-
-		for (const cv::Point &q : topol[p])
-			cv::line(img_show, p, q, draw_color);
-	}
-	cv::resize(img_show, img_show_scale, cv::Size(img_show.cols * scale, img_show.rows * scale));
-	cv::imwrite("results/topology.png", img_show_scale);
-	return;
+bool mangaShow::is_read_graph(){
+	if (graph.size()) return true;
+	return false;
 }
 
 Bitmap ^mangaShow::mat2Bitmap(cv::Mat img){
@@ -218,7 +207,7 @@ Bitmap ^mangaShow::mat2Bitmap(cv::Mat img){
 }
 
 Bitmap ^mangaShow::get_canvas_Bitmap(){
-	return mat2Bitmap(img_show_scale);
+	return mat2Bitmap(canvas);
 }
 
 std::vector<bool> mangaShow::get_curves_drawable(){
@@ -230,74 +219,24 @@ void mangaShow::test(){
 
 }
 
-
-template<typename T>
-// type:Mat type ex: uchar(0), i: row, j: col, c: channel
-T &mangaShow::ref_Mat_val(cv::Mat &m, T type, int i, int j, int c){
-	return ((T *)m.data)[(i * m.cols + j) * m.channels() + c];
-}
-
-template<typename T>
-// type:Mat type ex: uchar(0), i: row, j: col, c: channel
-T &mangaShow::ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c){
-	return ((T *)m.data)[(p.y * m.cols + p.x) * m.channels() + c];
-}
-
-void mangaShow::integral_curvature_curve(std::vector<cv::Point2d> curve){
-	// O O O O ... O O O O curve
-	// X X O O ... O O X X curvature
-	// X X X O ... O X X X curvature_integration
-	std::vector<double> curvature;
-	std::vector<double> curvature_integration;
-	curvature.resize(curve.size());
-	for (unsigned int i = 6; i < curve.size() - 6; ++i){
-		//double dx1 = curve[i].x - curve[i - 1].x;
-		//double dx2 = curve[i + 1].x - curve[i].x;
-		//double dy1 = curve[i].y - curve[i - 1].y;
-		//double dy2 = curve[i + 1].y - curve[i].y;
-		//double ddx = dx2 - dx1;
-		//double ddy = dy2 - dy1;
-		//
-		//if (pow(dx1 * dx1 + dy1 * dy1, 1.5) == 0) curvature.push_back(0);
-		//else curvature.push_back((dx1 * ddy - dy1 * ddx) / pow(dx1 * dx1 + dy1 * dy1, 1.5));
-
-		//double a = cv::norm(curve[i] - curve[i - 2]);
-		//double b = cv::norm(curve[i + 2] - curve[i]);
-		//double c = cv::norm(curve[i + 2] - curve[i - 2]);
-		//double R = circumscribed_circle_radius(a, b, c);
-		//if(R == 0) curvature.push_back(0);
-		//else curvature.push_back(1 / R);
-		
-		cv::Point2d p1 = curve[i - 6];
-		cv::Point2d p2 = curve[i - 3];
-		cv::Point2d p3 = curve[i - 0];
-		cv::Point2d p4 = curve[i + 3];
-		cv::Point2d p5 = curve[i + 6];
-
-		double b1 = (p5.x + p1.x + 2 * p4.x + 2 * p2.x - 6 * p3.x) / 12;
-		double b2 = (p5.y + p1.y + 2 * p4.y + 2 * p2.y - 6 * p3.y) / 12;
-		double c1 = (p5.x - p1.x + 4 * p4.x + 4 * p2.x) / 12;
-		double c2 = (p5.y - p1.y + 4 * p4.y + 4 * p2.y) / 12;
-		if (abs(pow(c1 * c1 + c2 * c2, 1.5)) < 0.000001) curvature[i] = 0;
-		else curvature[i] = abs(2 * (c1 * b2 - c2 * b1) / pow(c1 * c1 + c2 * c2, 1.5)) * 100;
-
-		printf("curvature: %lf\n", curvature[i]);
-
-
-		//double ds = cv::norm(curve[i] - curve[i - 1]);
-		//curvature_integration.push_back((curvature[i] + curvature[i - 1]) * ds / 2);
-		//if (i == 2 || i == curve.size() - 3){
-		//	curvature_integration.push_back(curvature_integration[curvature_integration.size() - 1]);
-		//	curvature_integration.push_back(curvature_integration[curvature_integration.size() - 1]);
-		//}
+std::vector<cv::Point2d> mangaShow::link_curve(cv::Point2d p, cv::Point2d q, std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> &pnts_used_pnts){
+	std::vector<cv::Point2d> curve;
+	curve.push_back(p);
+	pnts_used_pnts[p].erase(q);
+	while (end_pnts.find(q) == end_pnts.end() &&
+		junction_pnts.find(q) == junction_pnts.end()){
+		curve.push_back(q);
+		for (const cv::Point2d &r : graph[q]){
+			if (p != r){
+				p = q;
+				q = r;
+				break;
+			}
+		}
 	}
-
-	std::vector<cv::Point2d> data;
-	for (unsigned int i = 0; i < curve.size(); ++i){
-		if (!i) data.push_back(cv::Point2d(0, curvature[i]));
-		else data.push_back(cv::Point2d(data[data.size() - 1].x + cv::norm(curve[i] - curve[i - 1]), curvature[i]));
-	}
-	draw_plot_graph(data);
+	pnts_used_pnts[q].erase(curve[curve.size() - 1]);
+	curve.push_back(q);
+	return curve;
 }
 
 unsigned int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<double> b){
@@ -342,7 +281,7 @@ void mangaShow::draw_plot_graph(std::vector<cv::Point2d> data){
 	std::vector<cv::Point2d>::iterator max_y = std::max_element(data.begin(), data.end(), p_y_cmp);
 	std::vector<cv::Point2d>::iterator min_y = std::min_element(data.begin(), data.end(), p_y_cmp);
 	
-	double norm_x = data[data.size() - 1].x - data[0].x, norm_y = 0.202392 - (*min_y).y;
+	double norm_x = data[data.size() - 1].x - data[0].x, norm_y = (*max_y).y - (*min_y).y;
 	int inner_w = width - padding * 2, inner_h = height - padding * 2;
 	for (unsigned int i = 1; i < data.size(); ++i){
 		cv::line(plot_show,
