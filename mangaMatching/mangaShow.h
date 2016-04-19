@@ -34,8 +34,11 @@ public:
 	mangaShow();
 	void read_img(char *);
 	void read_graph(char *);
+	void read_match_curve(char *);
 	void build_curves();
-	void caculate_curve();
+	void calculate_curve();
+	void compare_curves();
+
 
 	void draw_graph();
 	void rng_curves_color();
@@ -44,6 +47,7 @@ public:
 
 	bool is_read_img();
 	bool is_read_graph();
+	bool is_read_match_curve();
 	Bitmap ^mat2Bitmap(cv::Mat);
 	Bitmap ^get_canvas_Bitmap();
 	std::vector<bool> get_curves_drawable();
@@ -64,6 +68,9 @@ private:
 	std::vector<cv::Scalar> curves_color;
 	std::vector<bool> curves_drawable;
 
+	std::vector<cv::Point2d> match_curve;
+	std::vector<double> a_itg_crvt, b_itg_crvt;
+
 	cv::Scalar red = cv::Scalar(0, 0, 255);
 	cv::Scalar yellow = cv::Scalar(0, 200, 200);
 	cv::Scalar green = cv::Scalar(0, 255, 0);
@@ -74,7 +81,12 @@ private:
 
 	std::vector<cv::Point2d> link_curve(cv::Point2d p, cv::Point2d q, std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> &pnts_used_pnts);
 	unsigned int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
-	void draw_plot_graph(std::vector<cv::Point2d> data);
+	void draw_plot_graph(std::vector<cv::Point2d> data, char *win_name);
+	void draw_plot_graph(std::vector<cv::Point2d> data_a, std::vector<cv::Point2d> data_b, double offset, char *win_name);
+	cv::Point2d linear_regression(std::vector<cv::Point2d> pnts);
+	double pnt_to_line_length(cv::Point2d pnt, cv::Point2d mc);
+	cv::Point2d project_pnt(cv::Point2d pnt, cv::Point2d mc);
+	std::vector<cv::Point2d> rotate_curve(std::vector<cv::Point2d> curve);
 
 	template<typename T>
 	// type:Mat type ex: uchar(0), i: row, j: col, c: channel

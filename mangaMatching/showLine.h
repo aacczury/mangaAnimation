@@ -42,6 +42,7 @@ namespace mangaMatching {
 	private: System::Windows::Forms::GroupBox^  lineCheck_groupBox;
 	private: System::Windows::Forms::Label^  image_label;
 	private: System::Windows::Forms::Label^  graph_label;
+	private: System::Windows::Forms::Label^  curve_label;
 
 
 	protected:
@@ -63,6 +64,7 @@ namespace mangaMatching {
 			this->lineCheck_groupBox = (gcnew System::Windows::Forms::GroupBox());
 			this->image_label = (gcnew System::Windows::Forms::Label());
 			this->graph_label = (gcnew System::Windows::Forms::Label());
+			this->curve_label = (gcnew System::Windows::Forms::Label());
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->showLine_pictureBox))->BeginInit();
 			this->SuspendLayout();
 			// 
@@ -83,9 +85,9 @@ namespace mangaMatching {
 			// lineCheck_groupBox
 			// 
 			this->lineCheck_groupBox->Dock = System::Windows::Forms::DockStyle::Bottom;
-			this->lineCheck_groupBox->Location = System::Drawing::Point(900, 70);
+			this->lineCheck_groupBox->Location = System::Drawing::Point(900, 114);
 			this->lineCheck_groupBox->Name = L"lineCheck_groupBox";
-			this->lineCheck_groupBox->Size = System::Drawing::Size(284, 791);
+			this->lineCheck_groupBox->Size = System::Drawing::Size(284, 747);
 			this->lineCheck_groupBox->TabIndex = 1;
 			this->lineCheck_groupBox->TabStop = false;
 			// 
@@ -115,11 +117,25 @@ namespace mangaMatching {
 			this->graph_label->Text = L"Graph";
 			this->graph_label->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
 			// 
+			// curve_label
+			// 
+			this->curve_label->BackColor = System::Drawing::Color::Gray;
+			this->curve_label->Font = (gcnew System::Drawing::Font(L"·L³n¥¿¶ÂÅé", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+				static_cast<System::Byte>(136)));
+			this->curve_label->ForeColor = System::Drawing::Color::White;
+			this->curve_label->Location = System::Drawing::Point(920, 73);
+			this->curve_label->Name = L"curve_label";
+			this->curve_label->Size = System::Drawing::Size(252, 24);
+			this->curve_label->TabIndex = 2;
+			this->curve_label->Text = L"Curve";
+			this->curve_label->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
+			// 
 			// showLine
 			// 
 			this->AutoScaleDimensions = System::Drawing::SizeF(6, 12);
 			this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
 			this->ClientSize = System::Drawing::Size(1184, 861);
+			this->Controls->Add(this->curve_label);
 			this->Controls->Add(this->graph_label);
 			this->Controls->Add(this->image_label);
 			this->Controls->Add(this->lineCheck_groupBox);
@@ -136,6 +152,7 @@ namespace mangaMatching {
 					 array<System::String^>^files = (array<System::String^>^)e->Data->GetData(DataFormats::FileDrop);
 					 System::String ^imgExt = ".jpg|.png|.bmp|.jpeg|.gif";
 					 System::String ^graphExt = ".graph";
+					 System::String ^curveExt = ".curve";
 					 try{
 						 for (int i = 0; i < files->Length; ++i){
 							 System::String ^ext = Path::GetExtension(files[i]);
@@ -149,11 +166,21 @@ namespace mangaMatching {
 								 ms.read_graph(fileName);
 								 this->graph_label->BackColor = System::Drawing::Color::Green;
 							 }
+							 else if (curveExt->IndexOf(ext) >= 0){
+								 char *fileName = (char*)System::Runtime::InteropServices::Marshal::StringToHGlobalAnsi(files[i]).ToPointer();
+								 ms.read_match_curve(fileName);
+								 this->curve_label->BackColor = System::Drawing::Color::Green;
+								 //ms.calculate_curve();
+							 }
 						 }
 						 if (ms.is_read_img() && ms.is_read_graph()){
 							 //ms.draw_graph();
 							 ms.build_curves();
 							 ms.draw_curves();
+							 //ms.test();
+							 if (ms.is_read_match_curve()){
+								 ms.compare_curves();
+							 }
 							 this->showLine_pictureBox->Image = ms.get_canvas_Bitmap();
 
 							 this->lineCheck_groupBox->Controls->Clear();
