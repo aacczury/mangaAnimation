@@ -82,14 +82,14 @@ void mangaShow::build_curves(){
 		}
 	}
 	
-	for (const cv::Point2d &p : end_pnts){
+	for (const cv::Point2d p : end_pnts){
 		cv::Point2d q = *(graph[p].begin());
 		if (pnts_used_pnts[p].find(q) == pnts_used_pnts[p].end()) continue;
 		curves.push_back(link_curve(p, q, pnts_used_pnts));
 	}
 
-	for (const cv::Point2d &p : junction_pnts){
-		for (const cv::Point2d &q : graph[p]){
+	for (const cv::Point2d p : junction_pnts){
+		for (const cv::Point2d q : graph[p]){
 			if (pnts_used_pnts[p].find(q) == pnts_used_pnts[p].end()) continue;
 			curves.push_back(link_curve(p, q, pnts_used_pnts));
 		}
@@ -97,6 +97,15 @@ void mangaShow::build_curves(){
 
 	std::sort(curves.begin(), curves.end(), curve_length_cmp);
 	printf("=> Building curves done\n");
+	return;
+}
+
+void mangaShow::building_pnt_to_curve(){
+	pnt_to_curve.clear();
+	for (unsigned int i = 0; i < curves.size(); ++i){
+		pnt_to_curve[curves[i][0]].push_back(i);
+		pnt_to_curve[curves[i][curves[i].size() - 1]].push_back(i);
+	}
 	return;
 }
 
@@ -122,58 +131,167 @@ void mangaShow::calculate_curve(){
 	draw_plot_graph(data, "match_curve_integration_curvature");
 }
 
-void mangaShow::compare_curves(){
-	std::vector<cv::Point2d> r_curve = rotate_curve(match_curve);
-	//draw_plot_graph(r_curve, "r_curve");
-	//std::reverse(match_curve.begin(), match_curve.end());
-	//CurveDescriptor a_c = CurveDescriptor(match_curve, 0.01, 3.0, true);
-	//std::vector<double> a_curvature = a_c.get_curvature();
-	//for (unsigned int i = 0; i < a_curvature.size(); ++i) a_curvature[i] = abs(a_curvature[i]);
-	//printf("==> a curvature size: %u\n", a_curvature.size());
-	//a_itg_crvt = a_c.get_integration_curvature();
+std::vector<double> mangaShow::scale_curvature(std::vector<double> curvature, double s){
+	std::vector<double> s_c;
+	for(double i = 0; i <= curvature.size() - 1; i += 1 / s){
+		if (i == curvature.size() - 1) s_c.push_back(curvature[i]);
+		else s_c.push_back(curvature[(int)i] * (floor(i) + 1 - i) + curvature[(int)i + 1] * (i - floor(i)));
+	}
+	return s_c;
+}
+
+double mangaShow::curve_length(std::vector<cv::Point2d> curve){
+	double total = 0;
+	for (unsigned int i = 1; i < curve.size(); ++i)	total += cv::norm(curve[i] - curve[i - 1]);
+	return total;
+}
+
+bool point2d_vector_size_cmp(const std::vector<cv::Point2d> &a, const std::vector<cv::Point2d> &b){
+	return a.size() > b.size();
+}
+void mangaShow::compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b){
+	double a_ratio = curve_length(a) / cv::norm(a[0] - a[a.size() - 1]);
+
+	CurveDescriptor a_d = CurveDescriptor(a, 0.01, 3.0, true);
+	if (a_d.is_error()) return;
+	CurveDescriptor b_d = CurveDescriptor(b, 0.005, 3.0, true);
+	if (b_d.is_error()) return;
+
+	std::vector<double> a_crvt = a_d.get_curvature();
+	//for (unsigned int i = 0; i < a_crvt.size(); ++i) printf(".. %lf\n", a_crvt[i]);
+	std::vector<double> a_crvt_refine;
+	for (unsigned int i = 0; i < a_crvt.size(); ++i) if (a_crvt[i] > 1.0) a_crvt_refine.push_back(a_crvt[i]);
+	std::vector<double> b_crvt = b_d.get_curvature();
+
 	//std::vector<cv::Point2d> data_a;
-	//data_a.resize(a_curvature.size());
-	//for (unsigned int i = 0; i < a_curvature.size(); ++i) data_a[i] = cv::Point2d(i, abs(a_curvature[i]));
-	//
-	//std::vector<cv::Point2d> curve;
-	//if (curves[1][0] == curves[4][0] || curves[1][0] == curves[4][curves[4].size() - 1])
-	//	std::reverse(curves[1].begin(), curves[1].end());
-	//if (curves[4][curves[4].size() - 1] == curves[1][curves[1].size() - 1])
-	//	std::reverse(curves[4].begin(), curves[4].end());
-	//for (unsigned int i = 0; i < curves[1].size(); ++i) curve.push_back(curves[1][i]);
-	//for (unsigned int i = 0; i < curves[4].size(); ++i) curve.push_back(curves[4][i]);
-	//CurveDescriptor b_c = CurveDescriptor(curve, 0.005, 3.0, true);
-	//std::vector<double> b_tmp_curvature = b_c.get_curvature();
-	//std::vector<double> b_curvature;
-	//b_curvature.resize(b_tmp_curvature.size() * 2);
-	//for (unsigned int i = 0; i < b_curvature.size(); ++i){
-	//	if (!i) b_curvature[i] = abs(b_tmp_curvature[i / 2]) / 2;
-	//	else if (i % 2) b_curvature[i] = abs(b_tmp_curvature[i / 2]);
-	//	else if (!(i % 2))b_curvature[i] = (abs(b_tmp_curvature[i / 2 - 1]) + abs(b_tmp_curvature[i / 2])) / 2;
+	//for (unsigned int i = 0; i < a_crvt.size(); ++i) data_a.push_back(cv::Point2d(i, a_crvt[i]));
+
+	std::vector<cv::Point2d> b_sample = b_d.get_sample_curve();
+
+	std::vector<unsigned int> repeat_longest_range;
+	repeat_longest_range.resize(b_sample.size());
+	for (double i = 1; i <= 4; ++i){
+		if (a_crvt.size() / i <= 3) break;
+		std::vector<double> b_crvt_scale = scale_curvature(b_crvt, i);
+		if (b_crvt_scale.size() < a_crvt.size()) continue;
+
+		int offset = normalize_cross_correlation(a_crvt, b_crvt_scale);
+		//char s[100];
+		//sprintf(s, "cc %i", i);
+		//std::vector<cv::Point2d> data_b;
+		//for (unsigned int i = 0; i < b_crvt_scale.size(); ++i) data_b.push_back(cv::Point2d(i, b_crvt_scale[i]));
+		//draw_plot_graph(data_a, data_b, offset, s);
+
+		if (offset < 0) continue;
+		for (unsigned int j = 0; j < a_crvt.size() / i; ++j)
+			repeat_longest_range[offset / i + j] ++;
+	}
+
+	std::vector<unsigned int>::iterator max_repeat = std::max_element(repeat_longest_range.begin(), repeat_longest_range.end());
+	if (*max_repeat == 0) return;
+	std::vector<std::vector<cv::Point2d>> connect_ranges;
+	std::vector<cv::Point2d> connect_range;
+	bool is_start = false;
+	for (unsigned int i = 0; i < repeat_longest_range.size(); ++i){
+		if (repeat_longest_range[i] == *max_repeat){
+			is_start = true;
+			connect_range.push_back(b_sample[i]);
+		}
+		else if (is_start){
+			connect_ranges.push_back(connect_range);
+			connect_range.clear();
+			is_start = false;
+		}
+	}
+	if (is_start) connect_ranges.push_back(connect_range);
+	std::sort(connect_ranges.begin(), connect_ranges.end(), point2d_vector_size_cmp);
+
+	double b_length = curve_length(connect_ranges[0]);
+	double b_distance = cv::norm(connect_ranges[0][0] - connect_ranges[0][connect_ranges[0].size() - 1]);
+	double b_ratio = b_length / b_distance;
+	if ((a_ratio - a_ratio * 0.2 > b_ratio) ||
+		(a_ratio + a_ratio * 0.4 < b_ratio)) return;
+
+	int ps = max(img_read.rows, img_read.cols);
+	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
+	for (unsigned int i = 1; i < connect_ranges[0].size(); ++i)
+		cv::line(img_show,
+		cv::Point2d(connect_ranges[0][i - 1].x * ps, connect_ranges[0][i - 1].y * -ps) + ds,
+		cv::Point2d(connect_ranges[0][i].x * ps, connect_ranges[0][i].y * -ps) + ds,
+		cv::Scalar(0, 0, 255));
+	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
+
+	return;
+}
+
+void mangaShow::compare_curves(){
+
+	//for (unsigned int i = 0; i < curves.size(); ++i){
+	//	printf("==> curve %u ~\n", i);
+	//	std::reverse(match_curve.begin(), match_curve.end());
+	//	compare_curve(match_curve, curves[i]);
+	//	std::reverse(match_curve.begin(), match_curve.end());
+	//	compare_curve(match_curve, curves[i]);
 	//}
-	//printf("==> b curvature size: %u\n", b_curvature.size());
-	//b_itg_crvt = b_c.get_integration_curvature();
-	//std::vector<cv::Point2d> data_b;
-	//data_b.resize(b_curvature.size());
-	//for (unsigned int i = 0; i < b_curvature.size(); ++i) data_b[i] = cv::Point2d(i, abs(b_curvature[i]));
-	//
-	//unsigned int offset = normalize_cross_correlation(a_curvature, b_curvature);
-	//draw_plot_graph(data_a, data_b, offset, "compare intg crvt");
-	////std::vector<cv::Point2d> segment = b_c.get_segment_curve(offset, offset + a_itg_crvt.size());
-	////
-	//std::vector<cv::Point2d> sample_b = b_c.get_sample_curve();
-	//std::vector<cv::Point2d> segment;
-	//for (unsigned int i = 0; i < a_curvature.size() / 2; ++i)
-	//	segment.push_back(sample_b[offset / 2 + i]);
-	//int ps = max(img_read.rows, img_read.cols);
-	//cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
-	//for (unsigned int i = 1; i < segment.size(); ++i)
-	//	cv::line(img_show,
-	//	cv::Point2d(segment[i - 1].x * ps, segment[i - 1].y * -ps) + ds,
-	//	cv::Point2d(segment[i].x * ps, segment[i].y * -ps) + ds,
-	//	cv::Scalar(0, 0, 255));
-	//cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
-	//return;
+
+	building_pnt_to_curve();
+	//std::vector<cv::Point2d> curve;
+	//for (unsigned int i = 0; i < curves.size(); ++i){
+	//	for (unsigned int j = 0; j < pnt_to_curve[curves[i][0]].size(); ++j){
+	//		unsigned int cnnct_crv = pnt_to_curve[curves[i][0]][j];
+	//		if (cnnct_crv <= i) continue;
+	//		curve.clear();
+	//		if (curves[cnnct_crv][0] == curves[i][0]) std::reverse(curves[cnnct_crv].begin(), curves[cnnct_crv].end());
+	//		for (unsigned int k = 0; k < curves[cnnct_crv].size(); ++k) curve.push_back(curves[cnnct_crv][k]);
+	//		for (unsigned int k = 1; k < curves[i].size(); ++k) curve.push_back(curves[i][k]);
+	//		printf("==> curve %u X %u ~\n", i, cnnct_crv);
+	//		std::reverse(match_curve.begin(), match_curve.end());
+	//		compare_curve(match_curve, curve);
+	//		std::reverse(match_curve.begin(), match_curve.end());
+	//		compare_curve(match_curve, curve);
+	//	}
+	//	for (unsigned int j = 0; j < pnt_to_curve[curves[i][curves[i].size() - 1]].size(); ++j){
+	//		unsigned int cnnct_crv = pnt_to_curve[curves[i][curves[i].size() - 1]][j];
+	//		if (cnnct_crv <= i) continue;
+	//		curve.clear();
+	//		if (curves[cnnct_crv][curves[cnnct_crv].size() - 1] == curves[i][curves[i].size() - 1]) std::reverse(curves[cnnct_crv].begin(), curves[cnnct_crv].end());
+	//		for (unsigned int k = 0; k < curves[i].size(); ++k) curve.push_back(curves[i][k]);
+	//		for (unsigned int k = 1; k < curves[cnnct_crv].size(); ++k) curve.push_back(curves[cnnct_crv][k]);
+	//		printf("==> curve %u X %u ~\n", i, cnnct_crv);
+	//		std::reverse(match_curve.begin(), match_curve.end());
+	//		compare_curve(match_curve, curve);
+	//		std::reverse(match_curve.begin(), match_curve.end());
+	//		compare_curve(match_curve, curve);
+	//	}
+	//}
+
+	std::vector<cv::Point2d> curve;
+	for (unsigned int i = 0; i < curves.size(); ++i){
+		for (unsigned int j = 0; j < pnt_to_curve[curves[i][0]].size(); ++j){
+			unsigned int a_crv = pnt_to_curve[curves[i][0]][j];
+			if (a_crv == i) continue;
+			curve.clear();
+			if (curves[a_crv][0] == curves[i][0]) std::reverse(curves[a_crv].begin(), curves[a_crv].end());
+			for (unsigned int k = 0; k < curves[a_crv].size(); ++k) curve.push_back(curves[a_crv][k]);
+			for (unsigned int k = 1; k < curves[i].size(); ++k) curve.push_back(curves[i][k]);
+
+			std::vector<cv::Point2d> curve_e;
+			for (unsigned int k = 0; k < pnt_to_curve[curves[i][curves[i].size() - 1]].size(); ++k){
+				unsigned int b_crv = pnt_to_curve[curves[i][curves[i].size() - 1]][k];
+				if (b_crv == i) continue;
+				curve_e = curve;
+				if (curves[b_crv][curves[b_crv].size() - 1] == curves[i][curves[i].size() - 1]) std::reverse(curves[b_crv].begin(), curves[b_crv].end());
+				for (unsigned int l = 1; l < curves[b_crv].size(); ++l) curve_e.push_back(curves[b_crv][l]);
+				printf("==> curve %u X %u X %u ~\n", a_crv, i, b_crv);
+				std::reverse(match_curve.begin(), match_curve.end());
+				compare_curve(match_curve, curve_e);
+				std::reverse(match_curve.begin(), match_curve.end());
+				compare_curve(match_curve, curve_e);
+			}
+		}
+	}
+
+	return;
 }
 
 void mangaShow::draw_graph(){
@@ -338,7 +456,7 @@ std::vector<cv::Point2d> mangaShow::link_curve(cv::Point2d p, cv::Point2d q, std
 	return curve;
 }
 
-unsigned int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<double> b){
+int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<double> b){
 	double max_v = 0;
 	unsigned int offset = 0;
 
@@ -367,7 +485,8 @@ unsigned int mangaShow::normalize_cross_correlation(std::vector<double> a, std::
 			offset = i;
 		}
 	}
-
+	printf("max_v: %lf\n", max_v);
+	if (max_v < 0.5) return -1;
 	return offset;
 }
 
@@ -423,67 +542,4 @@ void mangaShow::draw_plot_graph(std::vector<cv::Point2d> data_a, std::vector<cv:
 	printf("=> Drawing %s plot done.\n", win_name);
 	cv::imshow(win_name, plot_show);
 	cv::imwrite("results/plot.png", plot_show);
-}
-
-// m, c. y = mx + c
-cv::Point2d mangaShow::linear_regression(std::vector<cv::Point2d> pnts){
-	double avg_x = 0, avg_y = 0;
-	for (unsigned int i = 0; i < pnts.size(); ++i){
-		avg_x += pnts[i].x;
-		avg_y += pnts[i].y;
-	}
-	avg_x /= pnts.size();
-	avg_y /= pnts.size();
-	double S_xy = 0, S_xx = 0;
-	for (unsigned int i = 0; i < pnts.size(); ++i){
-		S_xy += (pnts[i].x - avg_x) * (pnts[i].y - avg_y);
-		S_xx += (pnts[i].x - avg_x) * (pnts[i].x - avg_x);
-	}
-	double m = S_xy / S_xx;
-	double c = avg_y - m * avg_x;
-	return cv::Point2d(m, c);
-}
-
-// mx -  y + c = 0
-// ax + by + c = 0 => |ax + by + c| / (a^2 + b^2)^0.5
-double mangaShow::pnt_to_line_length(cv::Point2d pnt, cv::Point2d mc){
-	double m = mc.x, c = mc.y;
-	return abs(m * pnt.x - pnt.y + c) / sqrt(m * m + 1);
-}
-
-// mx - y + c  = 0
-// mx + y + c' = 0
-cv::Point2d mangaShow::project_pnt(cv::Point2d pnt, cv::Point2d mc){
-	double m = mc.x, c = mc.y;
-	double _c = -m * pnt.x - pnt.y;
-	double x = (_c + c) / 2 / m;
-	double y = (_c - c) / 2;
-	return cv::Point2d(x, y);
-}
-
-std::vector<cv::Point2d> mangaShow::rotate_curve(std::vector<cv::Point2d> curve){
-	std::reverse(curve.begin(), curve.end());
-	for (unsigned int i = 0; i < curve.size(); ++i) printf("%lf, %lf\n", curve[i].x, curve[i].y);
-	cv::Point2d mc = linear_regression(curve);
-	std::vector<cv::Point2d> regline;
-	regline.push_back(cv::Point2d(curve[0].x, mc.x * curve[0].x + mc.y));
-	regline.push_back(cv::Point2d(curve[curve.size() - 1].x, mc.x * curve[curve.size() - 1].x + mc.y));
-	draw_plot_graph(regline, curve, 0, "QQ");
-	std::vector<cv::Point2d> r_curve;
-	r_curve.resize(curve.size());
-
-	cv::Point2d propnt0 = project_pnt(curve[0], mc);
-	cv::Point2d v1 = cv::Point2d(1, mc.x);
-	cv::Point2d n1 = curve[0] - propnt0;
-	for (unsigned int i = 0; i < curve.size(); ++i){
-		cv::Point2d propnt = project_pnt(curve[i], mc);
-		printf("%lf, %lf\n", propnt.x, propnt.y);
-		double x_dir = v1.ddot(propnt - propnt0) >= 0 ? 1 : -1;
-		double y_dir = n1.ddot(curve[i] - propnt) >= 0 ? 1 : -1;
-		r_curve[i] = cv::Point2d(cv::norm(propnt - propnt0),
-			cv::norm(curve[i] - propnt) * y_dir);
-		//printf("%lf, %lf\n", r_curve[i].x, r_curve[i].y);
-	}
-	draw_plot_graph(r_curve, "QQQ");
-	return r_curve;
 }

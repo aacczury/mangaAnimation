@@ -8,6 +8,10 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, double sample_lengt
 	gaussian_derivs();
 
 	curve = sampling_curve(c, sample_length);
+	if (curve.size() <= 3){
+		too_short_error = true;
+		return;
+	}
 	if (is_open){
 		border_curve = bordering_curve(curve);
 		curve_gaussian(border_curve, c_gp, c_dgp, c_ddgp, is_open);
@@ -15,10 +19,10 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, double sample_lengt
 	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
 	curvature = curve_curvature(curve, c_dgp, c_ddgp);
 
-	caculate_integration();
-	sampling_integration();
-	curve_gaussian(integration_sample, i_gp, i_dgp, i_ddgp, true);
-	integration_curvature = intg_curvature(integration_sample, i_dgp, i_ddgp);
+	//caculate_integration();
+	//sampling_integration();
+	//curve_gaussian(integration_sample, i_gp, i_dgp, i_ddgp, true);
+	//integration_curvature = intg_curvature(integration_sample, i_dgp, i_ddgp);
 }
 
 CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, unsigned int sample_num, double s, bool is_open){
@@ -84,6 +88,11 @@ std::vector<cv::Point2d> CurveDescriptor::get_segment_curve(unsigned int begin, 
 		segment.push_back(curve[i]);
 	}
 	return segment;
+}
+
+bool CurveDescriptor::is_error(){
+	if (too_short_error) return true;
+	return false;
 }
 
 std::vector<cv::Point2d> CurveDescriptor::bordering_curve(std::vector<cv::Point2d> c){

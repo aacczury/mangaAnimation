@@ -65,6 +65,7 @@ private:
 	std::unordered_set<cv::Point2d> end_pnts;
 	std::unordered_set<cv::Point2d> junction_pnts;
 	std::vector<std::vector<cv::Point2d>> curves;
+	std::unordered_map<cv::Point2d, std::vector<unsigned int>> pnt_to_curve;
 	std::vector<cv::Scalar> curves_color;
 	std::vector<bool> curves_drawable;
 
@@ -80,13 +81,13 @@ private:
 	cv::Scalar gray = cv::Scalar(125, 125, 125);
 
 	std::vector<cv::Point2d> link_curve(cv::Point2d p, cv::Point2d q, std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> &pnts_used_pnts);
-	unsigned int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
+	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
 	void draw_plot_graph(std::vector<cv::Point2d> data, char *win_name);
 	void draw_plot_graph(std::vector<cv::Point2d> data_a, std::vector<cv::Point2d> data_b, double offset, char *win_name);
-	cv::Point2d linear_regression(std::vector<cv::Point2d> pnts);
-	double pnt_to_line_length(cv::Point2d pnt, cv::Point2d mc);
-	cv::Point2d project_pnt(cv::Point2d pnt, cv::Point2d mc);
-	std::vector<cv::Point2d> rotate_curve(std::vector<cv::Point2d> curve);
+	std::vector<double> scale_curvature(std::vector<double> curvature, double s);
+	void compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b);
+	void building_pnt_to_curve();
+	double curve_length(std::vector<cv::Point2d> curve);
 
 	template<typename T>
 	// type:Mat type ex: uchar(0), i: row, j: col, c: channel

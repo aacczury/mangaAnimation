@@ -23,7 +23,10 @@ public:
 
 	std::vector<cv::Point2d> get_segment_curve(unsigned int begin, unsigned int end);
 
+	bool is_error();
+
 private:
+	bool too_short_error = false;
 	double sigma;
 	int M;
 	std::vector<double> g, dg, ddg;
