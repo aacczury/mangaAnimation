@@ -43,6 +43,7 @@ namespace mangaMatching {
 	private: System::Windows::Forms::Label^  image_label;
 	private: System::Windows::Forms::Label^  graph_label;
 	private: System::Windows::Forms::Label^  curve_label;
+	private: System::Windows::Forms::PictureBox^  sampleFace_pictureBox;
 
 
 	protected:
@@ -65,17 +66,18 @@ namespace mangaMatching {
 			this->image_label = (gcnew System::Windows::Forms::Label());
 			this->graph_label = (gcnew System::Windows::Forms::Label());
 			this->curve_label = (gcnew System::Windows::Forms::Label());
+			this->sampleFace_pictureBox = (gcnew System::Windows::Forms::PictureBox());
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->showLine_pictureBox))->BeginInit();
+			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->sampleFace_pictureBox))->BeginInit();
 			this->SuspendLayout();
 			// 
 			// showLine_pictureBox
 			// 
 			this->showLine_pictureBox->AllowDrop = true;
 			this->showLine_pictureBox->BackColor = System::Drawing::Color::Black;
-			this->showLine_pictureBox->Dock = System::Windows::Forms::DockStyle::Left;
 			this->showLine_pictureBox->Location = System::Drawing::Point(0, 0);
 			this->showLine_pictureBox->Name = L"showLine_pictureBox";
-			this->showLine_pictureBox->Size = System::Drawing::Size(900, 861);
+			this->showLine_pictureBox->Size = System::Drawing::Size(894, 861);
 			this->showLine_pictureBox->SizeMode = System::Windows::Forms::PictureBoxSizeMode::Zoom;
 			this->showLine_pictureBox->TabIndex = 0;
 			this->showLine_pictureBox->TabStop = false;
@@ -84,7 +86,6 @@ namespace mangaMatching {
 			// 
 			// lineCheck_groupBox
 			// 
-			this->lineCheck_groupBox->Dock = System::Windows::Forms::DockStyle::Bottom;
 			this->lineCheck_groupBox->Location = System::Drawing::Point(900, 114);
 			this->lineCheck_groupBox->Name = L"lineCheck_groupBox";
 			this->lineCheck_groupBox->Size = System::Drawing::Size(284, 747);
@@ -130,11 +131,23 @@ namespace mangaMatching {
 			this->curve_label->Text = L"Curve";
 			this->curve_label->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
 			// 
+			// sampleFace_pictureBox
+			// 
+			this->sampleFace_pictureBox->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(64)),
+				static_cast<System::Int32>(static_cast<System::Byte>(64)), static_cast<System::Int32>(static_cast<System::Byte>(64)));
+			this->sampleFace_pictureBox->Location = System::Drawing::Point(668, 639);
+			this->sampleFace_pictureBox->Name = L"sampleFace_pictureBox";
+			this->sampleFace_pictureBox->Size = System::Drawing::Size(226, 222);
+			this->sampleFace_pictureBox->SizeMode = System::Windows::Forms::PictureBoxSizeMode::Zoom;
+			this->sampleFace_pictureBox->TabIndex = 3;
+			this->sampleFace_pictureBox->TabStop = false;
+			// 
 			// showLine
 			// 
 			this->AutoScaleDimensions = System::Drawing::SizeF(6, 12);
 			this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
 			this->ClientSize = System::Drawing::Size(1184, 861);
+			this->Controls->Add(this->sampleFace_pictureBox);
 			this->Controls->Add(this->curve_label);
 			this->Controls->Add(this->graph_label);
 			this->Controls->Add(this->image_label);
@@ -143,6 +156,7 @@ namespace mangaMatching {
 			this->Name = L"showLine";
 			this->Text = L"showLine";
 			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->showLine_pictureBox))->EndInit();
+			(cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->sampleFace_pictureBox))->EndInit();
 			this->ResumeLayout(false);
 
 		}
@@ -163,23 +177,22 @@ namespace mangaMatching {
 							 }
 							 else if (graphExt->IndexOf(ext) >= 0){
 								 char *fileName = (char*)System::Runtime::InteropServices::Marshal::StringToHGlobalAnsi(files[i]).ToPointer();
-								 ms.read_graph(fileName);
+								 ms.read_graph(fileName, MANGA_FACE);
 								 this->graph_label->BackColor = System::Drawing::Color::Green;
 							 }
 							 else if (curveExt->IndexOf(ext) >= 0){
 								 char *fileName = (char*)System::Runtime::InteropServices::Marshal::StringToHGlobalAnsi(files[i]).ToPointer();
-								 ms.read_match_curve(fileName);
+								 ms.read_graph(fileName, SAMPLE_FACE);
 								 this->curve_label->BackColor = System::Drawing::Color::Green;
 								 //ms.calculate_curve();
 							 }
 						 }
-						 if (ms.is_read_img() && ms.is_read_graph()){
-							 //ms.draw_graph();
-							 ms.build_curves();
-							 ms.draw_curves();
+						 if (ms.is_read_img() && ms.is_read_mangaFace()){
+							 ms.draw_curves(false);
 							 //ms.test();
-							 if (ms.is_read_match_curve()){
-								 ms.compare_curves();
+							 if (ms.is_read_sampleFace()){
+								 ms.find_seed();
+								 this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
 							 }
 							 this->showLine_pictureBox->Image = ms.get_canvas_Bitmap();
 

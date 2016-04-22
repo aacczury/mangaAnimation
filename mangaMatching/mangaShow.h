@@ -13,7 +13,7 @@
 
 #include <Windows.h>
 
-//#include "VectorCurve.h"
+#include "GraphFile.h"
 #include "CurveDescriptor.h"
 
 using namespace System::Drawing;
@@ -29,27 +29,29 @@ namespace std{ // cv::Point unordered_set and unordered_map need a hash function
 }
 #endif
 
+#define MANGA_FACE 0
+#define SAMPLE_FACE 1
+
 class mangaShow{
 public:
 	mangaShow();
 	void read_img(char *);
-	void read_graph(char *);
-	void read_match_curve(char *);
-	void build_curves();
-	void calculate_curve();
-	void compare_curves();
+	void read_graph(char *, int g_s = MANGA_FACE);
 
+	void find_seed();
 
 	void draw_graph();
 	void rng_curves_color();
 	void set_curves_drawable(int index = -1, bool is_draw = true);
-	void draw_curves();
+	void draw_curves(bool is_colorful = true);
 
 	bool is_read_img();
-	bool is_read_graph();
-	bool is_read_match_curve();
+	bool is_read_mangaFace();
+	bool is_read_sampleFace();
+
 	Bitmap ^mat2Bitmap(cv::Mat);
 	Bitmap ^get_canvas_Bitmap();
+	Bitmap ^get_sample_canvas_Bitmap();
 	std::vector<bool> get_curves_drawable();
 
 	void test();
@@ -59,19 +61,14 @@ private:
 
 	int scale = 3;
 	cv::RNG rng = cv::RNG(1235);
-	cv::Mat img_read, img_show, canvas;
-	std::unordered_set<cv::Point2d> graph_pnts;
-	std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> graph;
-	std::unordered_set<cv::Point2d> end_pnts;
-	std::unordered_set<cv::Point2d> junction_pnts;
-	std::vector<std::vector<cv::Point2d>> curves;
-	std::unordered_map<cv::Point2d, std::vector<unsigned int>> pnt_to_curve;
+	cv::Mat img_read;
+	cv::Mat img_show, canvas;
+	cv::Mat sample_show, sample_canvas;
 	std::vector<cv::Scalar> curves_color;
 	std::vector<bool> curves_drawable;
 
-	std::vector<cv::Point2d> match_curve;
-	std::vector<double> a_itg_crvt, b_itg_crvt;
-
+	GraphFile mangaFace, sampleFace;
+	
 	cv::Scalar red = cv::Scalar(0, 0, 255);
 	cv::Scalar yellow = cv::Scalar(0, 200, 200);
 	cv::Scalar green = cv::Scalar(0, 255, 0);
@@ -80,20 +77,17 @@ private:
 	cv::Scalar purple = cv::Scalar(200, 0, 200);
 	cv::Scalar gray = cv::Scalar(125, 125, 125);
 
-	std::vector<cv::Point2d> link_curve(cv::Point2d p, cv::Point2d q, std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> &pnts_used_pnts);
 	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
-	void draw_plot_graph(std::vector<cv::Point2d> data, char *win_name);
-	void draw_plot_graph(std::vector<cv::Point2d> data_a, std::vector<cv::Point2d> data_b, double offset, char *win_name);
-	std::vector<double> scale_curvature(std::vector<double> curvature, double s);
 	void compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b);
-	void building_pnt_to_curve();
+	void compare_curves(std::vector<cv::Point2d> sample_curve);
+
+	template<typename T> // type:Mat type ex: uchar(0), i: row, j: col, c: channel
+	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0);
 	double curve_length(std::vector<cv::Point2d> curve);
 
-	template<typename T>
-	// type:Mat type ex: uchar(0), i: row, j: col, c: channel
-	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0){
-		return ((T *)m.data)[(p.y * m.cols + p.x) * m.channels() + c];
-	}
+	void draw_sample_face(unsigned int sample);
+	void draw_plot_graph(std::vector<cv::Point2d> data, char *win_name);
+	void draw_plot_graph(std::vector<cv::Point2d> data_a, std::vector<cv::Point2d> data_b, double offset, char *win_name);
 };
 
 #endif

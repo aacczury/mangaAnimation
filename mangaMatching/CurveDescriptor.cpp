@@ -17,6 +17,7 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, double sample_lengt
 		curve_gaussian(border_curve, c_gp, c_dgp, c_ddgp, is_open);
 	}
 	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
+	smooth_curve = c_gp;
 	curvature = curve_curvature(curve, c_dgp, c_ddgp);
 
 	//caculate_integration();
@@ -38,44 +39,22 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, unsigned int sample
 		curve_gaussian(border_curve, c_gp, c_dgp, c_ddgp, is_open);
 	}
 	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
+	smooth_curve = c_gp;
 	curvature = curve_curvature(curve, c_dgp, c_ddgp);
 
-	caculate_integration();
-	sampling_integration();
-	curve_gaussian(integration_sample, i_gp, i_dgp, i_ddgp, true);
-	integration_curvature = intg_curvature(integration_sample, i_dgp, i_ddgp);
+	//caculate_integration();
+	//sampling_integration();
+	//curve_gaussian(integration_sample, i_gp, i_dgp, i_ddgp, true);
+	//integration_curvature = intg_curvature(integration_sample, i_dgp, i_ddgp);
 }
 
-std::vector<cv::Point2d> CurveDescriptor::get_sample_curve(){
-	return curve;
-}
-
-std::vector<cv::Point2d> CurveDescriptor::get_border_curve(){
-	return border_curve;
-}
-
-std::vector<cv::Point2d> CurveDescriptor::get_smooth_curve(){
-	return c_gp;
-}
-
-std::vector<double> CurveDescriptor::get_curvature(){
-	return curvature;
-}
-
-std::vector<cv::Point2d> CurveDescriptor::get_integration(){
-	return integration;
-}
-
-std::vector<cv::Point2d> CurveDescriptor::get_integration_sample(){
-	return integration_sample;
-}
-
-std::vector<cv::Point2d> CurveDescriptor::get_smooth_integration(){
-	return i_gp;
-}
-
-std::vector<double> CurveDescriptor::get_integration_curvature(){
-	return integration_curvature;
+std::vector<double> CurveDescriptor::scaling_curvature(double s){
+	scale_curvature.clear();
+	for (double i = 0; i <= curvature.size() - 1; i += 1 / s){
+		if (i == curvature.size() - 1) scale_curvature.push_back(curvature[i]);
+		else scale_curvature.push_back(curvature[(int)i] * (floor(i) + 1 - i) + curvature[(int)i + 1] * (i - floor(i)));
+	}
+	return scale_curvature;
 }
 
 std::vector<cv::Point2d> CurveDescriptor::get_segment_curve(unsigned int begin, unsigned int end){
@@ -184,15 +163,6 @@ std::vector<double> CurveDescriptor::curve_curvature(std::vector<cv::Point2d> c,
 	return crvt;
 }
 
-std::vector<double> CurveDescriptor::intg_curvature(std::vector<cv::Point2d> c, std::vector<cv::Point2d> dgp, std::vector<cv::Point2d> ddgp){
-	int L = M >> 1;
-	std::vector<double> crvt;
-	crvt.resize(c.size() - L * 2);
-	for (int i = 0; i < crvt.size(); i++) // Mokhtarian 02' eqn (4)
-		crvt[i] = (dgp[i].x * ddgp[i].y - ddgp[i].x * dgp[i].y) / pow(dgp[i].x * dgp[i].x + dgp[i].y * dgp[i].y, 1.5);
-	return crvt;
-}
-
 void CurveDescriptor::caculate_integration(){
 	integration.resize(curvature.size() * 2 + 1);
 	for (unsigned int i = 0; i < integration.size(); ++i){
@@ -224,4 +194,13 @@ void CurveDescriptor::sampling_integration(){
 		else ++i;
 	}
 	return;
+}
+
+std::vector<double> CurveDescriptor::intg_curvature(std::vector<cv::Point2d> c, std::vector<cv::Point2d> dgp, std::vector<cv::Point2d> ddgp){
+	int L = M >> 1;
+	std::vector<double> crvt;
+	crvt.resize(c.size() - L * 2);
+	for (int i = 0; i < crvt.size(); i++) // Mokhtarian 02' eqn (4)
+		crvt[i] = (dgp[i].x * ddgp[i].y - ddgp[i].x * dgp[i].y) / pow(dgp[i].x * dgp[i].x + dgp[i].y * dgp[i].y, 1.5);
+	return crvt;
 }
