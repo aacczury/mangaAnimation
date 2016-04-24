@@ -1,9 +1,17 @@
 #include "mangaShow.h"
 
+
+
+bool point2d_vector_size_cmp(const std::vector<cv::Point2d> &a, const std::vector<cv::Point2d> &b){ return a.size() > b.size(); }
+bool p_x_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.x < b.x; }
+bool p_y_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.y < b.y; }
+
 mangaShow::mangaShow(){
 	img_read = img_show = canvas = cv::Mat();
 	curves_color.clear();
 	curves_drawable.clear();
+	mangaFace_CD.clear();
+	sampleFace_CD.clear();
 }
 
 void mangaShow::read_img(char *filename){
@@ -16,16 +24,22 @@ void mangaShow::read_img(char *filename){
 }
 
 void mangaShow::read_graph(char *filename, int g_s){
-	if (g_s == MANGA_FACE)
+	if (g_s == MANGA_FACE){
 		mangaFace = GraphFile(filename);
-	else if (g_s == SAMPLE_FACE)
+		for (unsigned int i = 0; i < mangaFace.curves.size(); ++i)
+			mangaFace_CD.push_back(CurveDescriptor(mangaFace.curves[i], 0.005, 3.0, true));
+	}
+	else if (g_s == SAMPLE_FACE){
 		sampleFace = GraphFile(filename);
+		for (unsigned int i = 0; i < sampleFace.curves.size(); ++i)
+			sampleFace_CD.push_back(CurveDescriptor(sampleFace.curves[i], 0.005, 3.0, true));
+	}
 	return;
 }
 
 void mangaShow::find_seed(){
-	compare_curves(sampleFace.curves[8]);
-	draw_sample_face(8);
+	compare_curves(sampleFace.curves[1]);
+	draw_sample_face(1);
 	return;
 }
 
@@ -149,6 +163,16 @@ std::vector<bool> mangaShow::get_curves_drawable(){
 }
 
 void mangaShow::test(){
+	unsigned int notable_index = max_curvature_index(sampleFace_CD[1].curvature);
+	cv::Point2d t = curve_pnt_tangent(sampleFace_CD[1].curve, notable_index);
+	cv::Point2d p = sampleFace_CD[1].curve[notable_index];
+	double c = p.x * t.y + p.y * -t.x;
+	std::vector<cv::Point2d> data_a;
+	std::vector<cv::Point2d>::iterator min_it = std::min_element(sampleFace_CD[1].curve.begin(), sampleFace_CD[1].curve.end(), p_x_cmp);
+	std::vector<cv::Point2d>::iterator max_it = std::max_element(sampleFace_CD[1].curve.begin(), sampleFace_CD[1].curve.end(), p_x_cmp);
+	data_a.push_back(cv::Point2d((*min_it).x, (c - (*min_it).x * t.y) / -t.x));
+	data_a.push_back(cv::Point2d((*max_it).x, (c - (*max_it).x * t.y) / -t.x));
+	draw_plot_graph(data_a, sampleFace_CD[1].curve, 0, "QQ");
 }
 
 int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<double> b){
@@ -181,21 +205,27 @@ int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<do
 		}
 	}
 	//printf("max_v: %lf\n", max_v);
-	if (max_v < 0.7) return -1;
+	if (max_v < 0.8) return -1;
 	return offset;
 }
 
-bool point2d_vector_size_cmp(const std::vector<cv::Point2d> &a, const std::vector<cv::Point2d> &b){
-	return a.size() > b.size();
-}
 void mangaShow::compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b){
 	double a_ratio = curve_length(a) / cv::norm(a[0] - a[a.size() - 1]);
+	std::vector<unsigned int> a_notable_index = douglas_peucker(a, 1);
+	if (a_notable_index.size() < 3) printf("WTF!!\n");
+	double a_degree = abc_degree(a[0], a[a_notable_index[1]], a[a.size() - 1]);
 
 	CurveDescriptor a_d = CurveDescriptor(a, 0.005, 3.0, true);
 	if (a_d.is_error()) return;
 	CurveDescriptor b_d = CurveDescriptor(b, 0.005, 3.0, true);
 	if (b_d.is_error()) return;
 	
+	//std::vector<cv::Point2d> data;
+	//for (unsigned int i = 0; i < a_d.curvature.size(); ++i)
+	//	data.push_back(cv::Point2d(i, abs(a_d.curvature[i])));
+	//draw_plot_graph(data, "QQQ");
+	//cv::waitKey(0);
+
 	for (double i = 1; i <= 1.5; i += 0.5){
 		if (a_d.curvature.size() / i <= 3) break;
 		b_d.scaling_curvature(i);
@@ -214,6 +244,12 @@ void mangaShow::compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2
 		if ((a_ratio - a_ratio * 0.1 > b_ratio) ||
 			(a_ratio + a_ratio * 0.2 < b_ratio)) continue;
 
+		std::vector<unsigned int> b_notable_index = douglas_peucker(segment, 1);
+		if (b_notable_index.size() < 3) printf("WTF!!\n");
+		double b_degree = abc_degree(segment[0], segment[b_notable_index[1]], segment[segment.size() - 1]);
+		if ((a_degree - CV_PI / 8 > b_degree) ||
+			(a_degree + CV_PI / 8 < b_degree)) continue;
+
 		int ps = max(img_read.rows, img_read.cols);
 		cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 		for (unsigned int i = 1; i < segment.size(); ++i)
@@ -228,45 +264,10 @@ void mangaShow::compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2
 }
 
 void mangaShow::compare_curves(std::vector<cv::Point2d> sample_curve){
-
-	for (unsigned int i = 0; i < mangaFace.curves.size(); ++i){
-		std::reverse(sample_curve.begin(), sample_curve.end());
-		compare_curve(sample_curve, mangaFace.curves[i]);
-		std::reverse(sample_curve.begin(), sample_curve.end());
-		compare_curve(sample_curve, mangaFace.curves[i]);
-	}
-	printf("==> curve 1 ~ done.\n");
+	std::vector<bool> curve_is_visited;
+	curve_is_visited.resize(mangaFace.curves.size()); // all will be zero
 
 	std::vector<cv::Point2d> curve;
-	for (unsigned int i = 0; i < mangaFace.curves.size(); ++i){
-		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.curves[i][0]].size(); ++j){
-			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.curves[i][0]][j];
-			if (a_crv <= i) continue;
-			curve.clear();
-			if (mangaFace.curves[a_crv][0] == mangaFace.curves[i][0])
-				std::reverse(mangaFace.curves[a_crv].begin(), mangaFace.curves[a_crv].end());
-			for (unsigned int k = 0; k < mangaFace.curves[a_crv].size(); ++k) curve.push_back(mangaFace.curves[a_crv][k]);
-			for (unsigned int k = 1; k < mangaFace.curves[i].size(); ++k) curve.push_back(mangaFace.curves[i][k]);
-			std::reverse(sample_curve.begin(), sample_curve.end());
-			compare_curve(sample_curve, curve);
-			std::reverse(sample_curve.begin(), sample_curve.end());
-			compare_curve(sample_curve, curve);
-		}
-		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.curves[i][mangaFace.curves[i].size() - 1]].size(); ++j){
-			unsigned int cnnct_crv = mangaFace.pnt_to_curve[mangaFace.curves[i][mangaFace.curves[i].size() - 1]][j];
-			if (cnnct_crv <= i) continue;
-			curve.clear();
-			if (mangaFace.curves[cnnct_crv][mangaFace.curves[cnnct_crv].size() - 1] == mangaFace.curves[i][mangaFace.curves[i].size() - 1])
-				std::reverse(mangaFace.curves[cnnct_crv].begin(), mangaFace.curves[cnnct_crv].end());
-			for (unsigned int k = 0; k < mangaFace.curves[i].size(); ++k) curve.push_back(mangaFace.curves[i][k]);
-			for (unsigned int k = 1; k < mangaFace.curves[cnnct_crv].size(); ++k) curve.push_back(mangaFace.curves[cnnct_crv][k]);
-			std::reverse(sample_curve.begin(), sample_curve.end());
-			compare_curve(sample_curve, curve);
-			std::reverse(sample_curve.begin(), sample_curve.end());
-			compare_curve(sample_curve, curve);
-		}
-	}
-	printf("==> curve 2 ~ done.\n");
 
 	for (unsigned int i = 0; i < mangaFace.curves.size(); ++i){
 		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.curves[i][0]].size(); ++j){
@@ -277,7 +278,7 @@ void mangaShow::compare_curves(std::vector<cv::Point2d> sample_curve){
 				std::reverse(mangaFace.curves[a_crv].begin(), mangaFace.curves[a_crv].end());
 			for (unsigned int k = 0; k < mangaFace.curves[a_crv].size(); ++k) curve.push_back(mangaFace.curves[a_crv][k]);
 			for (unsigned int k = 1; k < mangaFace.curves[i].size(); ++k) curve.push_back(mangaFace.curves[i][k]);
-			
+
 			std::vector<cv::Point2d> curve_e;
 			for (unsigned int k = 0; k < mangaFace.pnt_to_curve[mangaFace.curves[i][mangaFace.curves[i].size() - 1]].size(); ++k){
 				unsigned int b_crv = mangaFace.pnt_to_curve[mangaFace.curves[i][mangaFace.curves[i].size() - 1]][k];
@@ -290,12 +291,61 @@ void mangaShow::compare_curves(std::vector<cv::Point2d> sample_curve){
 				compare_curve(sample_curve, curve_e);
 				std::reverse(sample_curve.begin(), sample_curve.end());
 				compare_curve(sample_curve, curve_e);
+				curve_is_visited[a_crv] = curve_is_visited[i] = curve_is_visited[b_crv] = true;
 			}
 		}
 	}
 	printf("==> curve 3 ~ done.\n");
 
+	for (unsigned int i = 0; i < mangaFace.curves.size(); ++i){
+		if (curve_is_visited[i]) continue;
+		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.curves[i][0]].size(); ++j){
+			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.curves[i][0]][j];
+			if (a_crv <= i || curve_is_visited[a_crv]) continue;
+			curve.clear();
+			if (mangaFace.curves[a_crv][0] == mangaFace.curves[i][0])
+				std::reverse(mangaFace.curves[a_crv].begin(), mangaFace.curves[a_crv].end());
+			for (unsigned int k = 0; k < mangaFace.curves[a_crv].size(); ++k) curve.push_back(mangaFace.curves[a_crv][k]);
+			for (unsigned int k = 1; k < mangaFace.curves[i].size(); ++k) curve.push_back(mangaFace.curves[i][k]);
+			std::reverse(sample_curve.begin(), sample_curve.end());
+			compare_curve(sample_curve, curve);
+			std::reverse(sample_curve.begin(), sample_curve.end());
+			compare_curve(sample_curve, curve);
+			curve_is_visited[a_crv] = curve_is_visited[i] = true;
+		}
+		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.curves[i][mangaFace.curves[i].size() - 1]].size(); ++j){
+			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.curves[i][mangaFace.curves[i].size() - 1]][j];
+			if (a_crv <= i || curve_is_visited[a_crv]) continue;
+			curve.clear();
+			if (mangaFace.curves[a_crv][mangaFace.curves[a_crv].size() - 1] == mangaFace.curves[i][mangaFace.curves[i].size() - 1])
+				std::reverse(mangaFace.curves[a_crv].begin(), mangaFace.curves[a_crv].end());
+			for (unsigned int k = 0; k < mangaFace.curves[i].size(); ++k) curve.push_back(mangaFace.curves[i][k]);
+			for (unsigned int k = 1; k < mangaFace.curves[a_crv].size(); ++k) curve.push_back(mangaFace.curves[a_crv][k]);
+			std::reverse(sample_curve.begin(), sample_curve.end());
+			compare_curve(sample_curve, curve);
+			std::reverse(sample_curve.begin(), sample_curve.end());
+			compare_curve(sample_curve, curve);
+			curve_is_visited[a_crv] = curve_is_visited[i] = true;
+		}
+	}
+	printf("==> curve 2 ~ done.\n");
+
+	for (unsigned int i = 0; i < mangaFace.curves.size(); ++i){
+		if (curve_is_visited[i]) continue;
+		std::reverse(sample_curve.begin(), sample_curve.end());
+		compare_curve(sample_curve, mangaFace.curves[i]);
+		std::reverse(sample_curve.begin(), sample_curve.end());
+		compare_curve(sample_curve, mangaFace.curves[i]);
+		curve_is_visited[i] = true;
+	}
+	printf("==> curve 1 ~ done.\n");
+
 	return;
+}
+
+template<typename T>
+T &mangaShow::ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c){
+	return ((T *)m.data)[(p.y * m.cols + p.x) * m.channels() + c];
 }
 
 double mangaShow::curve_length(std::vector<cv::Point2d> curve){
@@ -304,9 +354,75 @@ double mangaShow::curve_length(std::vector<cv::Point2d> curve){
 	return total;
 }
 
-template<typename T>
-T &mangaShow::ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c){
-	return ((T *)m.data)[(p.y * m.cols + p.x) * m.channels() + c];
+// p to p1<->p2 line distance
+double mangaShow::perpendicular_distance(cv::Point2d p, cv::Point2d p1, cv::Point2d p2){
+	cv::Point2d v1 = p - p1, v2 = p2 - p1;
+	return std::fabs(v1.cross(v2)) / cv::norm(p1 - p2);
+}
+
+// only need input line & max_depth; p, q, depth using on recursive;
+std::vector<unsigned int> mangaShow::douglas_peucker(std::vector<cv::Point2d> &line, int max_depth, int p, int q, int depth){
+	if (q == -1) q = line.size();
+	if (p + 1 >= q - 1 || depth >= max_depth) return std::vector<unsigned int>();
+
+	double max_dis = 0;
+	int max_index = -1;
+	std::vector<unsigned int> angle_index, sub_angle_index;
+	for (size_t i = p + 1; i < q - 1; ++i){
+		double dis = perpendicular_distance(line[i], line[p], line[q - 1]);
+		if (dis > max_dis){
+			max_dis = dis;
+			max_index = i;
+		}
+	}
+	if (max_index == -1) return std::vector<unsigned int>();
+	angle_index.push_back(max_index);
+	sub_angle_index = douglas_peucker(line, max_depth, p, (p + q) >> 1, depth + 1);
+	for (size_t i = 0; i < sub_angle_index.size(); ++i) angle_index.push_back(sub_angle_index[i]);
+	sub_angle_index = douglas_peucker(line, max_depth, (p + q) >> 1, q, depth + 1);
+	for (size_t i = 0; i < sub_angle_index.size(); ++i) angle_index.push_back(sub_angle_index[i]);
+
+	if (p == 0 && q == line.size()){ // 最表層將端點加入
+		angle_index.push_back(p);
+		angle_index.push_back(q - 1);
+	}
+	// 去掉重複的點
+	std::sort(angle_index.begin(), angle_index.end());
+	std::vector<unsigned int>::iterator it = std::unique(angle_index.begin(), angle_index.end());
+	angle_index.resize(std::distance(angle_index.begin(), it));
+
+	return angle_index;
+}
+
+unsigned int mangaShow::max_curvature_index(std::vector<double> curvature){
+	double max_curvature = 0;
+	unsigned int max_index = 0;
+	for (unsigned int i = 0; i < curvature.size(); ++i){
+		if (curvature[i] > max_curvature){
+			max_curvature = curvature[i];
+			max_index = i;
+		}
+	}
+	return max_index;
+}
+
+// return [0, PI]
+double mangaShow::abc_degree(cv::Point2d a, cv::Point2d b, cv::Point2d c){
+	cv::Point2d v1 = a - b, v2 = c - b;
+	return acos(v1.ddot(v2) / cv::norm(v1) / cv::norm(v2));
+}
+
+cv::Point2d mangaShow::curve_pnt_tangent(std::vector<cv::Point2d> curve, unsigned int index){
+	if (index < 2 || index >= curve.size() - 2){
+		printf("... Can't caculate tangent\n");
+		return cv::Point2d(0, 0);
+	}
+	cv::Point2d v0 = curve[index - 1] - curve[index - 2];
+	cv::Point2d v1 = curve[index] - curve[index - 1];
+	cv::Point2d v2 = curve[index + 1] - curve[index];
+	cv::Point2d v3 = curve[index + 2] - curve[index + 1];
+	cv::Point2d t = v0 * 1 + v1 * 3 + v2 * 3 + v3 * 1;
+	return cv::Point2d(t.x / 8, t.y / 8);
 }
 
 void mangaShow::draw_sample_face(unsigned int sample){
@@ -324,8 +440,6 @@ void mangaShow::draw_sample_face(unsigned int sample){
 	return;
 }
 
-bool p_x_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.x < b.x; }
-bool p_y_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.y < b.y; }
 void mangaShow::draw_plot_graph(std::vector<cv::Point2d> data, char *win_name){
 	int width = 1200, height = 900, padding = 50;
 	cv::Mat plot_show = cv::Mat(height, width, CV_8UC3);

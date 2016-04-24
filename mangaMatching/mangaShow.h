@@ -68,6 +68,7 @@ private:
 	std::vector<bool> curves_drawable;
 
 	GraphFile mangaFace, sampleFace;
+	std::vector<CurveDescriptor> mangaFace_CD, sampleFace_CD;
 	
 	cv::Scalar red = cv::Scalar(0, 0, 255);
 	cv::Scalar yellow = cv::Scalar(0, 200, 200);
@@ -84,6 +85,11 @@ private:
 	template<typename T> // type:Mat type ex: uchar(0), i: row, j: col, c: channel
 	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0);
 	double curve_length(std::vector<cv::Point2d> curve);
+	double perpendicular_distance(cv::Point2d p, cv::Point2d p1, cv::Point2d p2);
+	std::vector<unsigned int> douglas_peucker(std::vector<cv::Point2d> &line, int max_depth, int p = 0, int q = -1, int depth = 0);
+	unsigned int max_curvature_index(std::vector<double> curvature);
+	double abc_degree(cv::Point2d a, cv::Point2d b, cv::Point2d c);
+	cv::Point2d curve_pnt_tangent(std::vector<cv::Point2d> curve, unsigned int index);
 
 	void draw_sample_face(unsigned int sample);
 	void draw_plot_graph(std::vector<cv::Point2d> data, char *win_name);

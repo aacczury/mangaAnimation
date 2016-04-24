@@ -18,7 +18,7 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, double sample_lengt
 	}
 	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
 	smooth_curve = c_gp;
-	curvature = curve_curvature(curve, c_dgp, c_ddgp);
+	curvature = curve_curvature(curve, c_dgp, c_ddgp); // abs curvature
 
 	//caculate_integration();
 	//sampling_integration();
@@ -40,7 +40,7 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, unsigned int sample
 	}
 	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
 	smooth_curve = c_gp;
-	curvature = curve_curvature(curve, c_dgp, c_ddgp);
+	curvature = curve_curvature(curve, c_dgp, c_ddgp); // abs curvature
 
 	//caculate_integration();
 	//sampling_integration();
@@ -159,7 +159,7 @@ std::vector<double> CurveDescriptor::curve_curvature(std::vector<cv::Point2d> c,
 	std::vector<double> crvt;
 	crvt.resize(c.size());
 	for (int i = 0; i < c.size(); i++) // Mokhtarian 02' eqn (4)
-		crvt[i] = (dgp[i].x * ddgp[i].y - ddgp[i].x * dgp[i].y) / pow(dgp[i].x * dgp[i].x + dgp[i].y * dgp[i].y, 1.5);
+		crvt[i] = abs(dgp[i].x * ddgp[i].y - ddgp[i].x * dgp[i].y) / pow(dgp[i].x * dgp[i].x + dgp[i].y * dgp[i].y, 1.5);
 	return crvt;
 }
 
