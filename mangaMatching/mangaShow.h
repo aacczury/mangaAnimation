@@ -10,6 +10,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <limits>
 
 #include <Windows.h>
 
@@ -60,7 +61,7 @@ private:
 	LARGE_INTEGER start_t, end_t, freq;
 
 	int scale = 3;
-	cv::RNG rng = cv::RNG(1235);
+	cv::RNG rng = cv::RNG(1234);
 	cv::Mat img_read;
 	cv::Mat img_show, canvas;
 	cv::Mat sample_show, sample_canvas;
@@ -69,6 +70,9 @@ private:
 
 	GraphFile mangaFace, sampleFace;
 	std::vector<CurveDescriptor> mangaFace_CD, sampleFace_CD;
+	std::vector<std::vector<std::vector<cv::Point2d>>> seeds;
+
+	std::vector<std::vector<double>> primitive_relative_angles;
 	
 	cv::Scalar red = cv::Scalar(0, 0, 255);
 	cv::Scalar yellow = cv::Scalar(0, 200, 200);
@@ -79,8 +83,11 @@ private:
 	cv::Scalar gray = cv::Scalar(125, 125, 125);
 
 	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
-	void compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b);
-	void compare_curves(std::vector<cv::Point2d> sample_curve);
+	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b);
+	void compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i);
+	void compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i);
+
+	std::vector<double> calculate_relative_angles(CurveDescriptor a, CurveDescriptor b);
 
 	template<typename T> // type:Mat type ex: uchar(0), i: row, j: col, c: channel
 	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0);
@@ -88,10 +95,11 @@ private:
 	double perpendicular_distance(cv::Point2d p, cv::Point2d p1, cv::Point2d p2);
 	std::vector<unsigned int> douglas_peucker(std::vector<cv::Point2d> &line, int max_depth, int p = 0, int q = -1, int depth = 0);
 	unsigned int max_curvature_index(std::vector<double> curvature);
+	double v_degree(cv::Point2d v1, cv::Point2d v2);
 	double abc_degree(cv::Point2d a, cv::Point2d b, cv::Point2d c);
-	cv::Point2d curve_pnt_tangent(std::vector<cv::Point2d> curve, unsigned int index);
+	cv::Point2d caculate_tangent(std::vector<cv::Point2d> curve, unsigned int index);
 
-	void draw_sample_face(unsigned int sample);
+	void draw_sample_face(unsigned int sample, cv::Scalar color);
 	void draw_plot_graph(std::vector<cv::Point2d> data, char *win_name);
 	void draw_plot_graph(std::vector<cv::Point2d> data_a, std::vector<cv::Point2d> data_b, double offset, char *win_name);
 };

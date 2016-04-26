@@ -1,5 +1,34 @@
 #include "CurveDescriptor.h"
 
+CurveDescriptor::CurveDescriptor(){
+	curve.clear();
+	border_curve.clear();
+	smooth_curve.clear();
+	curvature.clear();
+	scale_curvature.clear();
+}
+
+// not need sampling
+CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, double s, bool is_open){
+	init_curve = curve = c;
+	sigma = s;
+	M = (int)round(10.0 * sigma + 1.0) / 2 * 2 - 1;
+	assert(M % 2 == 1);
+	gaussian_derivs();
+
+	if (curve.size() <= 3){
+		too_short_error = true;
+		return;
+	}
+	if (is_open){
+		border_curve = bordering_curve(curve);
+		curve_gaussian(border_curve, c_gp, c_dgp, c_ddgp, is_open);
+	}
+	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
+	smooth_curve = c_gp;
+	curvature = curve_curvature(curve, c_dgp, c_ddgp); // abs curvature
+}
+
 CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, double sample_length, double s, bool is_open){
 	init_curve = c;
 	sigma = s;
@@ -19,11 +48,6 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, double sample_lengt
 	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
 	smooth_curve = c_gp;
 	curvature = curve_curvature(curve, c_dgp, c_ddgp); // abs curvature
-
-	//caculate_integration();
-	//sampling_integration();
-	//curve_gaussian(integration_sample, i_gp, i_dgp, i_ddgp, true);
-	//integration_curvature = intg_curvature(integration_sample, i_dgp, i_ddgp);
 }
 
 CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, unsigned int sample_num, double s, bool is_open){
@@ -41,11 +65,6 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, unsigned int sample
 	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
 	smooth_curve = c_gp;
 	curvature = curve_curvature(curve, c_dgp, c_ddgp); // abs curvature
-
-	//caculate_integration();
-	//sampling_integration();
-	//curve_gaussian(integration_sample, i_gp, i_dgp, i_ddgp, true);
-	//integration_curvature = intg_curvature(integration_sample, i_dgp, i_ddgp);
 }
 
 std::vector<double> CurveDescriptor::scaling_curvature(double s){

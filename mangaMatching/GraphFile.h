@@ -29,7 +29,7 @@ public:
 	std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> graph;
 	std::unordered_set<cv::Point2d> end_pnts;
 	std::unordered_set<cv::Point2d> junction_pnts;
-	std::vector<std::vector<cv::Point2d>> curves;
+	std::vector<std::vector<cv::Point2d>> curves, sample_curves;
 	std::unordered_map<cv::Point2d, std::vector<unsigned int>> pnt_to_curve;
 
 private:
