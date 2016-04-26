@@ -85,14 +85,20 @@ private:
 	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
 	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b);
 	void compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i);
+	void remove_duplication_seed(unsigned int p_i);
 	void compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i);
 
-	std::vector<double> calculate_relative_angles(CurveDescriptor a, CurveDescriptor b);
+	std::vector<double> calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c);
+	double calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c);
+	double calculate_inner_distance(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c);
 
 	template<typename T> // type:Mat type ex: uchar(0), i: row, j: col, c: channel
 	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0);
 	double curve_length(std::vector<cv::Point2d> curve);
+	cv::Point2d get_midpoint(cv::Point2d a, cv::Point2d b);
+	cv::Point2d get_midpoint(std::vector<cv::Point2d> pnts);
 	double perpendicular_distance(cv::Point2d p, cv::Point2d p1, cv::Point2d p2);
+
 	std::vector<unsigned int> douglas_peucker(std::vector<cv::Point2d> &line, int max_depth, int p = 0, int q = -1, int depth = 0);
 	unsigned int max_curvature_index(std::vector<double> curvature);
 	double v_degree(cv::Point2d v1, cv::Point2d v2);
