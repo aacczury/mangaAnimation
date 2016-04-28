@@ -191,8 +191,8 @@ namespace mangaMatching {
 							 ms.draw_curves(false);
 							 if (ms.is_read_sampleFace()){
 								 ms.find_seed();
-								 this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
 								 //ms.test();
+								 this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
 							 }
 							 this->showLine_pictureBox->Image = ms.get_canvas_Bitmap();
 

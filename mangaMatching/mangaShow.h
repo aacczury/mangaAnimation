@@ -83,10 +83,10 @@ private:
 	cv::Scalar gray = cv::Scalar(125, 125, 125);
 
 	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
-	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b);
-	void compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i);
+	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, bool is_c);
+	void compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i, bool is_c);
 	void remove_duplication_seed(unsigned int p_i);
-	void compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i);
+	void compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i, bool is_c);
 
 	std::vector<double> calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c);
 	double calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c);
@@ -105,7 +105,8 @@ private:
 	double abc_degree(cv::Point2d a, cv::Point2d b, cv::Point2d c);
 	cv::Point2d caculate_tangent(std::vector<cv::Point2d> curve, unsigned int index);
 
-	void draw_sample_face(unsigned int sample, cv::Scalar color);
+	void draw_sample_face(int sample = -1, cv::Scalar color = cv::Scalar(125, 125, 125));
+	void draw_relative_seed(unsigned int p_i, unsigned int p_j, unsigned int s_i, unsigned int s_j, cv::Scalar s_i_c, cv::Scalar s_j_c);
 	void draw_plot_graph(std::vector<cv::Point2d> data, char *win_name);
 	void draw_plot_graph(std::vector<cv::Point2d> data_a, std::vector<cv::Point2d> data_b, double offset, char *win_name);
 };
