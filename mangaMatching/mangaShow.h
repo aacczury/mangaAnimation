@@ -38,8 +38,11 @@ public:
 	void read_graph(char *, int g_s = MANGA_FACE);
 
 	void find_seed();
+	void relative_seed();
+	void draw_matching();
 
 	void draw_graph();
+	void draw_sample_face(int sample = -1, cv::Scalar color = cv::Scalar(125, 125, 125));
 	void rng_curves_color();
 	void set_curves_drawable(int index = -1, bool is_draw = true);
 	void draw_curves(bool is_colorful = true);
@@ -68,27 +71,37 @@ private:
 	GraphFile mangaFace, sampleFace;
 	std::vector<CurveDescriptor> mangaFace_CD, sampleFace_CD;
 	std::vector<std::vector<std::vector<cv::Point2d>>> seeds;
+	std::vector<std::unordered_map<unsigned int, double>> geo_score;
 
 	std::vector<std::vector<double>> primitive_relative_angles;
 	
 	cv::Scalar red = cv::Scalar(0, 0, 255);
-	cv::Scalar yellow = cv::Scalar(0, 200, 200);
-	cv::Scalar green = cv::Scalar(0, 255, 0);
-	cv::Scalar cyan = cv::Scalar(200, 200, 0);
+	cv::Scalar yellow = cv::Scalar(0, 255, 255);
+	cv::Scalar lime = cv::Scalar(0, 255, 0);
+	cv::Scalar cyan = cv::Scalar(255, 255, 0);
 	cv::Scalar blue = cv::Scalar(255, 0, 0);
-	cv::Scalar purple = cv::Scalar(200, 0, 200);
-	cv::Scalar gray = cv::Scalar(125, 125, 125);
+	cv::Scalar magenta = cv::Scalar(255, 0, 255);
+
+	cv::Scalar white = cv::Scalar(255, 255, 255);
+	cv::Scalar gray = cv::Scalar(128, 128, 128);
 	cv::Scalar black = cv::Scalar(0, 0, 0);
 
+	cv::Scalar maroon = cv::Scalar(0, 0, 128);
+	cv::Scalar olive = cv::Scalar(0, 128, 128);
+	cv::Scalar green = cv::Scalar(0, 128, 0);
+	cv::Scalar teal = cv::Scalar(128, 128, 0);
+	cv::Scalar navy = cv::Scalar(128, 0, 0);
+	cv::Scalar purple = cv::Scalar(128, 0, 128);
+
+	cv::Scalar brown = cv::Scalar(42, 42, 165);
 	cv::Scalar orange = cv::Scalar(0, 165, 255);
 	cv::Scalar turquoise = cv::Scalar(200, 213, 48);
+	cv::Scalar azure = cv::Scalar(255, 127, 0);
 	cv::Scalar mauve = cv::Scalar(255, 64, 102);
-	cv::Scalar olive = cv::Scalar(0, 128, 128);
-	cv::Scalar navy = cv::Scalar(128, 0, 0);
-	cv::Scalar maroon = cv::Scalar(0, 0, 128);
+	cv::Scalar violet = cv::Scalar(255, 0, 139);
 
-
-
+	cv::Scalar color_chips(int i);
+	
 	unsigned int get_notable_index(CurveDescriptor a, int is_c);
 	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
 	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, int is_c);
@@ -115,7 +128,6 @@ private:
 	double abc_degree(cv::Point2d a, cv::Point2d b, cv::Point2d c);
 	cv::Point2d caculate_tangent(std::vector<cv::Point2d> curve, unsigned int index);
 
-	void draw_sample_face(int sample = -1, cv::Scalar color = cv::Scalar(125, 125, 125));
 	void draw_relative_seed(unsigned int p_i, unsigned int p_j, unsigned int s_i, unsigned int s_j, cv::Scalar s_i_c, cv::Scalar s_j_c);
 	void draw_plot_graph(std::vector<cv::Point2d> data, char *win_name);
 	void draw_plot_graph(std::vector<cv::Point2d> data_a, std::vector<cv::Point2d> data_b, double offset, char *win_name);

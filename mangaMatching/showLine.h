@@ -191,6 +191,12 @@ namespace mangaMatching {
 								 //ms.calculate_curve();
 							 }
 						 }
+
+						 if (ms.is_read_img() && ms.is_read_sampleFace()){
+							 ms.draw_sample_face();
+							 this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
+						 }
+
 						 if (ms.is_read_img() && ms.is_read_mangaFace()){
 							 ms.draw_curves(false);
 							 if (ms.is_read_sampleFace()){
@@ -198,6 +204,13 @@ namespace mangaMatching {
 								 ms.find_seed();
 								 QueryPerformanceCounter(&end_t);
 								 printf("time cost: %lf\n", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
+
+								 QueryPerformanceCounter(&start_t);
+								 ms.relative_seed();
+								 QueryPerformanceCounter(&end_t);
+								 printf("time cost: %lf\n", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
+
+								 ms.draw_matching();
 								 //ms.test();
 								 this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
 							 }

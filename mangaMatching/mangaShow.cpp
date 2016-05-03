@@ -40,22 +40,25 @@ void mangaShow::read_graph(char *filename, int g_s){
 
 void mangaShow::find_seed(){
 	seeds.clear();
-	cv::Scalar color[12] = { cyan, blue, purple, red, yellow, green, orange, turquoise, mauve, olive, navy, maroon };
 
-	int is_cur[12] = { 0, 0, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1 };
-	int a_c[12] = { 0, 0, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1 };
-	int b_c[12] = { 0, 0, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1 };
+	int is_cur[12] = { 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
 		compare_curves_with_primitive(sampleFace.sample_curves[i], i, is_cur[i]);
 		draw_curves(false);
 		sample_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
-		draw_sample_face(i, color[i]);
+		draw_sample_face(i, color_chips(i));
 		char filename[100];
 		sprintf(filename, "results/seeds_%d.png", i);
 		cv::imwrite(filename, canvas);
 	}
 
-	std::vector<std::unordered_map<unsigned int, double>> geo_score;
+	return;
+}
+
+void mangaShow::relative_seed(){
+	int a_c[12] = { 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
+	int b_c[12] = { 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
+
 	geo_score.resize(sampleFace.sample_curves.size());
 	for (unsigned int t1 = 0; t1 < sampleFace.sample_curves.size(); ++t1){
 		for (unsigned int t2 = t1 + 1; t2 < sampleFace.sample_curves.size(); ++t2){
@@ -63,11 +66,11 @@ void mangaShow::find_seed(){
 			a_r_a.push_back(calculate_center_mass_distance(sampleFace_CD[t1], sampleFace_CD[t2], a_c[t1], a_c[t2]));
 			a_r_a.push_back(calculate_center_mass_angle(sampleFace_CD[t1], sampleFace_CD[t2], a_c[t1], a_c[t2]));
 			a_r_a.push_back(calculate_inner_distance(sampleFace_CD[t1], sampleFace_CD[t2], a_c[t1], a_c[t2]));
-	
+
 			for (unsigned int i = 0; i < a_r_a.size(); ++i)
 				printf("%lf, ", a_r_a[i]);
 			printf("\n");
-	
+
 			typedef struct mgd{
 				double diff;
 				unsigned int i, j;
@@ -75,7 +78,7 @@ void mangaShow::find_seed(){
 				mgd(){ diff = 0, i = 0, j = 0; gd.clear(); }
 			} mgd;
 			struct mgd_cmp{ bool operator()(mgd const &a, mgd const &b){ return a.diff < b.diff; }; };
-	
+
 			std::vector<mgd> gd_vec;
 			// TODO: no seed error
 			for (unsigned int i = 0; i < seeds[t1].size(); ++i){
@@ -84,29 +87,24 @@ void mangaShow::find_seed(){
 				for (unsigned int j = 0; j < seeds[t2].size(); ++j){
 					CurveDescriptor b_d = CurveDescriptor(seeds[t2][j], 0.005, 3.0, true);
 					if (b_d.is_error()) continue;
-	
+
 					std::vector<double> b_r_a = calculate_relative_angles(a_d, b_d, b_c[t1], b_c[t2]);
 					b_r_a.push_back(calculate_center_mass_distance(a_d, b_d, b_c[t1], b_c[t2]));
 					b_r_a.push_back(calculate_center_mass_angle(a_d, b_d, b_c[t1], b_c[t2]));
 					b_r_a.push_back(calculate_inner_distance(a_d, b_d, b_c[t1], b_c[t2]));
-	
+
 					mgd gd = mgd();
 					gd.gd = b_r_a;
-					//for (unsigned int k = 0; k < 4; ++k){
-					//	if (k == 3) gd.diff += abs(a_r_a[k] - b_r_a[k]) < 1 ? abs(a_r_a[k] - b_r_a[k]) : 2 - abs(a_r_a[k] - b_r_a[k]);
-					//	else if (k == 4) gd.diff += abs(b_r_a[k] / a_r_a[k] - 1);
-					//	else gd.diff += abs(a_r_a[k] - b_r_a[k]);
-					//}
 					gd.i = i, gd.j = j;
 					gd_vec.push_back(gd);
 				}
 			}
-	
+
 			std::vector<double> n_M, n_m;
 			n_M.resize(a_r_a.size()), n_m.resize(a_r_a.size());
-			for (unsigned int i = 0; i < a_r_a.size(); ++i)	
+			for (unsigned int i = 0; i < a_r_a.size(); ++i)
 				n_M[i] = std::numeric_limits<double>::min(), n_m[i] = std::numeric_limits<double>::max();
-			
+
 			for (unsigned int i = 0; i < gd_vec.size(); ++i){
 				for (unsigned int j = 0; j < a_r_a.size(); ++j){
 					double diff;
@@ -122,21 +120,21 @@ void mangaShow::find_seed(){
 					gd_vec[i].diff += (abs(gd_vec[i].gd[j] - a_r_a[j]) - n_m[j]) / (n_M[j] - n_m[j]);
 				}
 			}
-	
+
 			std::sort(gd_vec.begin(), gd_vec.end(), mgd_cmp());
-	
+
 			for (unsigned int i = 0; i < 5; ++i){
 				if (geo_score[t1].find(gd_vec[i].i) == geo_score[t1].end())
 					geo_score[t1][gd_vec[i].i] = 10 - i * 2;
 				else
 					geo_score[t1][gd_vec[i].i] += 10 - i * 2;
-	
+
 				if (geo_score[t2].find(gd_vec[i].j) == geo_score[t2].end())
 					geo_score[t2][gd_vec[i].j] = 10 - i * 2;
 				else
 					geo_score[t2][gd_vec[i].j] += 10 - i * 2;
-	
-	
+
+
 				//draw_curves(false);
 				//draw_relative_seed(t1, t2, gd_vec[i].i, gd_vec[i].j, green, red);
 				//char filename[100];
@@ -145,9 +143,14 @@ void mangaShow::find_seed(){
 			}
 		}
 	}
-	
+
+	return;
+}
+
+void mangaShow::draw_matching(){
 	int ps = std::max(img_read.rows, img_read.cols);
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
+
 	draw_curves(false);
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
 		double max_v = 0;
@@ -162,20 +165,19 @@ void mangaShow::find_seed(){
 			cv::line(img_show,
 				cv::Point2d(seeds[i][max_i][j - 1].x * ps, seeds[i][max_i][j - 1].y * -ps) + ds,
 				cv::Point2d(seeds[i][max_i][j].x * ps, seeds[i][max_i][j].y * -ps) + ds,
-				color[i]);
+				color_chips(i));
 		}
 	}
 	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
 	cv::imwrite("results/canvas.png", canvas);
-	
-	
+
 	sample_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
 		for (unsigned int j = 1; j < sampleFace.sample_curves[i].size(); ++j){
 			cv::line(sample_show,
-			cv::Point2d(sampleFace.sample_curves[i][j - 1].x * ps, sampleFace.sample_curves[i][j - 1].y * -ps) + ds,
-			cv::Point2d(sampleFace.sample_curves[i][j].x * ps, sampleFace.sample_curves[i][j].y * -ps) + ds,
-			color[i]);
+				cv::Point2d(sampleFace.sample_curves[i][j - 1].x * ps, sampleFace.sample_curves[i][j - 1].y * -ps) + ds,
+				cv::Point2d(sampleFace.sample_curves[i][j].x * ps, sampleFace.sample_curves[i][j].y * -ps) + ds,
+				color_chips(i));
 		}
 	}
 	cv::resize(sample_show, sample_canvas, cv::Size(sample_show.cols * scale, sample_show.rows * scale));
@@ -313,6 +315,13 @@ void mangaShow::test(){
 	draw_sample_face();
 	draw_sample_face(i, color[i]);
 	cv::imwrite("results/sample_canvas.png", sample_canvas);
+}
+
+cv::Scalar mangaShow::color_chips(int i){
+	std::vector<cv::Scalar> color =
+		std::vector<cv::Scalar>{red, yellow, lime, cyan, blue, magenta, maroon, olive, green, teal, navy, purple, orange, turquoise, azure, mauve, violet};
+	if (i < color.size()) return color[i];
+	return cv::Scalar(rng.uniform(50, 230), rng.uniform(50, 230), rng.uniform(50, 230));
 }
 
 unsigned int mangaShow::get_notable_index(CurveDescriptor a, int is_c){
@@ -692,12 +701,13 @@ void mangaShow::draw_sample_face(int sample, cv::Scalar color){
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 
 	if (sample == -1){
+		sample_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
 		for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
 			for (unsigned int j = 1; j < sampleFace.sample_curves[i].size(); ++j)
 				cv::line(sample_show,
 				cv::Point2d(sampleFace.sample_curves[i][j - 1].x * ps, sampleFace.sample_curves[i][j - 1].y * -ps) + ds,
 				cv::Point2d(sampleFace.sample_curves[i][j].x * ps, sampleFace.sample_curves[i][j].y * -ps) + ds,
-				color);
+				color_chips(i));
 		}
 		cv::resize(sample_show, sample_canvas, cv::Size(sample_show.cols * scale, sample_show.rows * scale));
 		return;
