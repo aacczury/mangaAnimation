@@ -12,8 +12,6 @@
 #include <unordered_set>
 #include <limits>
 
-#include <Windows.h>
-
 #include "GraphFile.h"
 #include "CurveDescriptor.h"
 
@@ -58,7 +56,6 @@ public:
 	void test();
 
 private:
-	LARGE_INTEGER start_t, end_t, freq;
 
 	int scale = 3;
 	cv::RNG rng = cv::RNG(1234);
@@ -81,16 +78,28 @@ private:
 	cv::Scalar blue = cv::Scalar(255, 0, 0);
 	cv::Scalar purple = cv::Scalar(200, 0, 200);
 	cv::Scalar gray = cv::Scalar(125, 125, 125);
+	cv::Scalar black = cv::Scalar(0, 0, 0);
 
+	cv::Scalar orange = cv::Scalar(0, 165, 255);
+	cv::Scalar turquoise = cv::Scalar(200, 213, 48);
+	cv::Scalar mauve = cv::Scalar(255, 64, 102);
+	cv::Scalar olive = cv::Scalar(0, 128, 128);
+	cv::Scalar navy = cv::Scalar(128, 0, 0);
+	cv::Scalar maroon = cv::Scalar(0, 0, 128);
+
+
+
+	unsigned int get_notable_index(CurveDescriptor a, int is_c);
 	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
-	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, bool is_c);
-	void compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i, bool is_c);
+	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, int is_c);
+	void compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i, int is_c);
 	void remove_duplication_seed(unsigned int p_i);
-	void compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i, bool is_c);
+	void compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i, int is_c);
 
-	std::vector<double> calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c);
-	double calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c);
-	double calculate_inner_distance(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c);
+	std::vector<double> calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
+	double calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
+	double calculate_center_mass_angle(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
+	double calculate_inner_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
 
 	template<typename T> // type:Mat type ex: uchar(0), i: row, j: col, c: channel
 	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0);
@@ -102,6 +111,7 @@ private:
 	std::vector<unsigned int> douglas_peucker(std::vector<cv::Point2d> &line, int max_depth, int p = 0, int q = -1, int depth = 0);
 	unsigned int max_curvature_index(std::vector<double> curvature);
 	double v_degree(cv::Point2d v1, cv::Point2d v2);
+	double v_angle(cv::Point2d v1, cv::Point2d v2);
 	double abc_degree(cv::Point2d a, cv::Point2d b, cv::Point2d c);
 	cv::Point2d caculate_tangent(std::vector<cv::Point2d> curve, unsigned int index);
 

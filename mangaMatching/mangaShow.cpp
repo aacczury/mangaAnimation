@@ -17,7 +17,6 @@ void mangaShow::read_img(char *filename){
 	img_show = img_read.clone();
 	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
 
-	QueryPerformanceFrequency(&freq);
 	printf("=> Reading image done.\n");
 }
 
@@ -41,18 +40,33 @@ void mangaShow::read_graph(char *filename, int g_s){
 
 void mangaShow::find_seed(){
 	seeds.clear();
-	bool is_cur[4] = { true, true, true, false };
+	cv::Scalar color[12] = { cyan, blue, purple, red, yellow, green, orange, turquoise, mauve, olive, navy, maroon };
+
+	int is_cur[12] = { 0, 0, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1 };
+	int a_c[12] = { 0, 0, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1 };
+	int b_c[12] = { 0, 0, 1, 0, 1, 1, 2, 1, 1, 1, 1, 1 };
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
 		compare_curves_with_primitive(sampleFace.sample_curves[i], i, is_cur[i]);
+		draw_curves(false);
+		sample_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
+		draw_sample_face(i, color[i]);
+		char filename[100];
+		sprintf(filename, "results/seeds_%d.png", i);
+		cv::imwrite(filename, canvas);
 	}
 
 	std::vector<std::unordered_map<unsigned int, double>> geo_score;
 	geo_score.resize(sampleFace.sample_curves.size());
 	for (unsigned int t1 = 0; t1 < sampleFace.sample_curves.size(); ++t1){
 		for (unsigned int t2 = t1 + 1; t2 < sampleFace.sample_curves.size(); ++t2){
-			std::vector<double> a_r_a = calculate_relative_angles(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]);
-			a_r_a.push_back(calculate_center_mass_distance(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]));
-			a_r_a.push_back(calculate_inner_distance(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]));
+			std::vector<double> a_r_a = calculate_relative_angles(sampleFace_CD[t1], sampleFace_CD[t2], a_c[t1], a_c[t2]);
+			a_r_a.push_back(calculate_center_mass_distance(sampleFace_CD[t1], sampleFace_CD[t2], a_c[t1], a_c[t2]));
+			a_r_a.push_back(calculate_center_mass_angle(sampleFace_CD[t1], sampleFace_CD[t2], a_c[t1], a_c[t2]));
+			a_r_a.push_back(calculate_inner_distance(sampleFace_CD[t1], sampleFace_CD[t2], a_c[t1], a_c[t2]));
+	
+			for (unsigned int i = 0; i < a_r_a.size(); ++i)
+				printf("%lf, ", a_r_a[i]);
+			printf("\n");
 	
 			typedef struct mgd{
 				double diff;
@@ -63,6 +77,7 @@ void mangaShow::find_seed(){
 			struct mgd_cmp{ bool operator()(mgd const &a, mgd const &b){ return a.diff < b.diff; }; };
 	
 			std::vector<mgd> gd_vec;
+			// TODO: no seed error
 			for (unsigned int i = 0; i < seeds[t1].size(); ++i){
 				CurveDescriptor a_d = CurveDescriptor(seeds[t1][i], 0.005, 3.0, true);
 				if (a_d.is_error()) continue;
@@ -70,43 +85,68 @@ void mangaShow::find_seed(){
 					CurveDescriptor b_d = CurveDescriptor(seeds[t2][j], 0.005, 3.0, true);
 					if (b_d.is_error()) continue;
 	
-					std::vector<double> b_r_a = calculate_relative_angles(a_d, b_d, is_cur[t1], is_cur[t2]);
-					b_r_a.push_back(calculate_center_mass_distance(a_d, b_d, is_cur[t1], is_cur[t2]));
-					b_r_a.push_back(calculate_inner_distance(a_d, b_d, is_cur[t1], is_cur[t2]));
+					std::vector<double> b_r_a = calculate_relative_angles(a_d, b_d, b_c[t1], b_c[t2]);
+					b_r_a.push_back(calculate_center_mass_distance(a_d, b_d, b_c[t1], b_c[t2]));
+					b_r_a.push_back(calculate_center_mass_angle(a_d, b_d, b_c[t1], b_c[t2]));
+					b_r_a.push_back(calculate_inner_distance(a_d, b_d, b_c[t1], b_c[t2]));
 	
 					mgd gd = mgd();
 					gd.gd = b_r_a;
-					for (unsigned int k = 0; k < b_r_a.size(); ++k){
-						gd.diff += abs(b_r_a[k] / a_r_a[k] - 1);
-					}
+					//for (unsigned int k = 0; k < 4; ++k){
+					//	if (k == 3) gd.diff += abs(a_r_a[k] - b_r_a[k]) < 1 ? abs(a_r_a[k] - b_r_a[k]) : 2 - abs(a_r_a[k] - b_r_a[k]);
+					//	else if (k == 4) gd.diff += abs(b_r_a[k] / a_r_a[k] - 1);
+					//	else gd.diff += abs(a_r_a[k] - b_r_a[k]);
+					//}
 					gd.i = i, gd.j = j;
 					gd_vec.push_back(gd);
 				}
 			}
+	
+			std::vector<double> n_M, n_m;
+			n_M.resize(a_r_a.size()), n_m.resize(a_r_a.size());
+			for (unsigned int i = 0; i < a_r_a.size(); ++i)	
+				n_M[i] = std::numeric_limits<double>::min(), n_m[i] = std::numeric_limits<double>::max();
+			
+			for (unsigned int i = 0; i < gd_vec.size(); ++i){
+				for (unsigned int j = 0; j < a_r_a.size(); ++j){
+					double diff;
+					if (j == 3) diff = abs(gd_vec[i].gd[j] - a_r_a[j]) < 1 ? abs(gd_vec[i].gd[j] - a_r_a[j]) : 2 - abs(gd_vec[i].gd[j] - a_r_a[j]);
+					else diff = abs(gd_vec[i].gd[j] - a_r_a[j]);
+					if (diff > n_M[j]) n_M[j] = diff;
+					if (diff < n_m[j]) n_m[j] = diff;
+				}
+			}
+			for (unsigned int i = 0; i < gd_vec.size(); ++i){
+				gd_vec[i].diff = 0;
+				for (unsigned int j = 0; j < a_r_a.size(); ++j){
+					gd_vec[i].diff += (abs(gd_vec[i].gd[j] - a_r_a[j]) - n_m[j]) / (n_M[j] - n_m[j]);
+				}
+			}
+	
 			std::sort(gd_vec.begin(), gd_vec.end(), mgd_cmp());
-
+	
 			for (unsigned int i = 0; i < 5; ++i){
 				if (geo_score[t1].find(gd_vec[i].i) == geo_score[t1].end())
 					geo_score[t1][gd_vec[i].i] = 10 - i * 2;
 				else
 					geo_score[t1][gd_vec[i].i] += 10 - i * 2;
-			
+	
 				if (geo_score[t2].find(gd_vec[i].j) == geo_score[t2].end())
 					geo_score[t2][gd_vec[i].j] = 10 - i * 2;
 				else
 					geo_score[t2][gd_vec[i].j] += 10 - i * 2;
-
-				draw_curves(false);
-				draw_relative_seed(t1, t2, gd_vec[i].i, gd_vec[i].j, green, red);
-				char filename[100];
-				sprintf(filename, "results/canvas_%d_%d_%d.png", t1, t2, i);
-				cv::imwrite(filename, canvas);
+	
+	
+				//draw_curves(false);
+				//draw_relative_seed(t1, t2, gd_vec[i].i, gd_vec[i].j, green, red);
+				//char filename[100];
+				//sprintf(filename, "results/canvas_%d_%d_%d.png", t1, t2, i);
+				//cv::imwrite(filename, canvas);
 			}
 		}
 	}
-
-	cv::Scalar color[4] = { cyan, blue, purple, red };
-	int ps = max(img_read.rows, img_read.cols);
+	
+	int ps = std::max(img_read.rows, img_read.cols);
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 	draw_curves(false);
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
@@ -147,7 +187,7 @@ void mangaShow::find_seed(){
 void mangaShow::draw_graph(){
 	img_show = img_read.clone();
 	
-	int ps = max(img_read.rows, img_read.cols);
+	int ps = std::max(img_read.rows, img_read.cols);
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 	for (const cv::Point2d &p : mangaFace.graph_pnts){
 		for (const cv::Point2d &q : mangaFace.graph[p]){
@@ -200,7 +240,7 @@ void mangaShow::draw_curves(bool is_colorful){
 	if (curves_color.size() != mangaFace.sample_curves.size()) rng_curves_color();
 	if (curves_drawable.size() != mangaFace.sample_curves.size()) set_curves_drawable();
 
-	int ps = max(img_read.rows, img_read.cols);
+	int ps = std::max(img_read.rows, img_read.cols);
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 	img_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
 	for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i)
@@ -275,6 +315,15 @@ void mangaShow::test(){
 	cv::imwrite("results/sample_canvas.png", sample_canvas);
 }
 
+unsigned int mangaShow::get_notable_index(CurveDescriptor a, int is_c){
+	switch (is_c){
+	case 0: return max_curvature_index(a.curvature);
+	case 1: return douglas_peucker(a.curve, 1)[1];
+	case 2: return a.curve.size() >> 1;
+	default: return a.curve.size() >> 1;
+	}
+}
+
 int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<double> b){
 	double max_v = 0;
 	unsigned int offset = 0;
@@ -308,7 +357,7 @@ int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<do
 	return offset;
 }
 
-std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, bool is_c){
+std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, int is_c){
 	std::vector<cv::Point2d> segment;
 
 	double a_ratio = curve_length(a) / cv::norm(a[0] - a[a.size() - 1]);
@@ -318,7 +367,7 @@ std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, st
 	CurveDescriptor b_d = CurveDescriptor(b, 3.0, true);
 	if (b_d.is_error()) return std::vector<cv::Point2d>();
 
-	unsigned int a_notable_index = is_c ? max_curvature_index(a_d.curvature) : douglas_peucker(a_d.curve, 1)[1];
+	unsigned int a_notable_index = get_notable_index(a_d, is_c);
 	double a_degree = abc_degree(a[0], a[a_notable_index], a[a.size() - 1]);
 
 	for (double i = 1; i <= 1.5; i += 0.5){
@@ -342,7 +391,7 @@ std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, st
 
 		CurveDescriptor s_d = CurveDescriptor(segment, 3.0, true);
 		if (s_d.is_error()) continue;
-		unsigned int b_notable_index = is_c ? max_curvature_index(s_d.curvature) : douglas_peucker(s_d.curve, 1)[1];;
+		unsigned int b_notable_index = get_notable_index(s_d, is_c);
 		double b_degree = abc_degree(segment[0], segment[b_notable_index], segment[segment.size() - 1]);
 		if ((a_degree - CV_PI / 8 > b_degree) ||
 			(a_degree + CV_PI / 8 < b_degree)) continue;
@@ -352,7 +401,7 @@ std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, st
 	return std::vector<cv::Point2d>();
 }
 
-void mangaShow::compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i, bool is_c){
+void mangaShow::compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i, int is_c){
 	std::vector<cv::Point2d> seed;
 
 	std::reverse(a.begin(), a.end());
@@ -391,7 +440,7 @@ void mangaShow::remove_duplication_seed(unsigned int p_i){
 	return;
 }
 
-void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i, bool is_c){
+void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i, int is_c){
 	if (seeds.size() != sampleFace.sample_curves.size()) seeds.resize(sampleFace.sample_curves.size());
 	std::vector<bool> curve_is_visited;
 	curve_is_visited.resize(mangaFace.sample_curves.size()); // all will be zero
@@ -474,12 +523,12 @@ void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_cu
 	return;
 }
 
-std::vector<double> mangaShow::calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c){
+std::vector<double> mangaShow::calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
 	std::vector<double> relative_angles;
 	relative_angles.resize(2);
 
-	unsigned int a_index = a_c ? max_curvature_index(a.curvature) : douglas_peucker(a.curve, 1)[1];
-	unsigned int b_index = b_c ? max_curvature_index(b.curvature) : douglas_peucker(b.curve, 1)[1];
+	unsigned int a_index = get_notable_index(a, a_c);
+	unsigned int b_index = get_notable_index(b, b_c);
 	cv::Point2d t1 = caculate_tangent(a.curve, a_index);
 	cv::Point2d t2 = caculate_tangent(b.curve, b_index);
 	cv::Point2d n1 = b.curve[b_index] - a.curve[a_index];
@@ -491,9 +540,9 @@ std::vector<double> mangaShow::calculate_relative_angles(CurveDescriptor a, Curv
 	return relative_angles;
 }
 
-double mangaShow::calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c){
-	unsigned int a_index = a_c ? max_curvature_index(a.curvature) : douglas_peucker(a.curve, 1)[1];
-	unsigned int b_index = b_c ? max_curvature_index(b.curvature) : douglas_peucker(b.curve, 1)[1];
+double mangaShow::calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
+	unsigned int a_index = get_notable_index(a, a_c);
+	unsigned int b_index = get_notable_index(b, b_c);
 	cv::Point2d c = get_midpoint(a.curve[a_index], b.curve[b_index]);
 	double r = cv::norm(a.curve[a_index] - c);
 	std::vector<cv::Point2d> pnts_in_circle;
@@ -505,12 +554,29 @@ double mangaShow::calculate_center_mass_distance(CurveDescriptor a, CurveDescrip
 	}
 	cv::Point2d m = get_midpoint(pnts_in_circle);
 
-	return cv::norm(m - c) / r;
+	return cv::norm(m - c) / r * ((m - c).cross(a.curve[a_index] - c) > 0 ? 1 : -1);
 }
 
-double mangaShow::calculate_inner_distance(CurveDescriptor a, CurveDescriptor b, bool a_c, bool b_c){
-	unsigned int a_index = a_c ? max_curvature_index(a.curvature) : douglas_peucker(a.curve, 1)[1];
-	unsigned int b_index = b_c ? max_curvature_index(b.curvature) : douglas_peucker(b.curve, 1)[1];
+double mangaShow::calculate_center_mass_angle(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
+	unsigned int a_index = get_notable_index(a, a_c);
+	unsigned int b_index = get_notable_index(b, b_c);
+	cv::Point2d c = get_midpoint(a.curve[a_index], b.curve[b_index]);
+	double r = cv::norm(a.curve[a_index] - c);
+	std::vector<cv::Point2d> pnts_in_circle;
+	for (unsigned int i = 0; i < a.curve.size(); ++i){
+		if (cv::norm(a.curve[i] - c) < r) pnts_in_circle.push_back(a.curve[i]);
+	}
+	for (unsigned int i = 0; i < b.curve.size(); ++i){
+		if (cv::norm(b.curve[i] - c) < r) pnts_in_circle.push_back(b.curve[i]);
+	}
+	cv::Point2d m = get_midpoint(pnts_in_circle);
+	
+	return v_angle(a.curve[a_index] - c, m - c) / CV_PI;
+}
+
+double mangaShow::calculate_inner_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
+	unsigned int a_index = get_notable_index(a, a_c);
+	unsigned int b_index = get_notable_index(b, b_c);
 
 	return cv::norm(a.curve[a_index] - b.curve[b_index]);
 }
@@ -595,6 +661,13 @@ double mangaShow::v_degree(cv::Point2d v1, cv::Point2d v2){
 	return acos(v1.ddot(v2) / cv::norm(v1) / cv::norm(v2));
 }
 
+// v2 - v1 angle
+double mangaShow::v_angle(cv::Point2d v1, cv::Point2d v2){
+	double a1 = atan2(v1.y, v1.x);
+	double a2 = atan2(v2.y, v2.x);
+	return a2 - a1;
+}
+
 // return [0, PI]
 double mangaShow::abc_degree(cv::Point2d a, cv::Point2d b, cv::Point2d c){
 	cv::Point2d v1 = a - b, v2 = c - b;
@@ -615,7 +688,7 @@ cv::Point2d mangaShow::caculate_tangent(std::vector<cv::Point2d> curve, unsigned
 }
 
 void mangaShow::draw_sample_face(int sample, cv::Scalar color){
-	int ps = max(img_read.rows, img_read.cols);
+	int ps = std::max(img_read.rows, img_read.cols);
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 
 	if (sample == -1){
@@ -651,7 +724,7 @@ void mangaShow::draw_sample_face(int sample, cv::Scalar color){
 }
 
 void mangaShow::draw_relative_seed(unsigned int p_i, unsigned int p_j, unsigned int s_i, unsigned int s_j, cv::Scalar s_i_c, cv::Scalar s_j_c){
-	int ps = max(img_read.rows, img_read.cols);
+	int ps = std::max(img_read.rows, img_read.cols);
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 
 	for (unsigned int i = 1; i < seeds[p_i][s_i].size(); ++i){
