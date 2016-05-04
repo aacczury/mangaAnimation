@@ -41,7 +41,7 @@ void mangaShow::read_graph(char *filename, int g_s){
 void mangaShow::find_seed(){
 	seeds.clear();
 
-	int is_cur[12] = { 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
+	int is_cur[12] = { 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
 		compare_curves_with_primitive(sampleFace.sample_curves[i], i, is_cur[i]);
 		draw_curves(false);
@@ -56,8 +56,8 @@ void mangaShow::find_seed(){
 }
 
 void mangaShow::relative_seed(){
-	int a_c[12] = { 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
-	int b_c[12] = { 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
+	int a_c[12] = { 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
+	int b_c[12] = { 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
 
 	geo_score.resize(sampleFace.sample_curves.size());
 	for (unsigned int t1 = 0; t1 < sampleFace.sample_curves.size(); ++t1){
@@ -82,10 +82,10 @@ void mangaShow::relative_seed(){
 			std::vector<mgd> gd_vec;
 			// TODO: no seed error
 			for (unsigned int i = 0; i < seeds[t1].size(); ++i){
-				CurveDescriptor a_d = CurveDescriptor(seeds[t1][i], 0.005, 3.0, true);
+				CurveDescriptor a_d = CurveDescriptor(seeds[t1][i], 0.005, 3.0);
 				if (a_d.is_error()) continue;
 				for (unsigned int j = 0; j < seeds[t2].size(); ++j){
-					CurveDescriptor b_d = CurveDescriptor(seeds[t2][j], 0.005, 3.0, true);
+					CurveDescriptor b_d = CurveDescriptor(seeds[t2][j], 0.005, 3.0);
 					if (b_d.is_error()) continue;
 
 					std::vector<double> b_r_a = calculate_relative_angles(a_d, b_d, b_c[t1], b_c[t2]);
@@ -148,8 +148,13 @@ void mangaShow::relative_seed(){
 }
 
 void mangaShow::draw_matching(){
+	int is_cur[12] = { 1, 1, 0, 1, 1, 1, 2, 1, 1, 1, 1, 1 };
+
 	int ps = std::max(img_read.rows, img_read.cols);
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
+
+	FILE *out_notable = fopen("results/notable.txt", "w");
+	fprintf(out_notable, "%d\n", sampleFace.sample_curves.size());
 
 	draw_curves(false);
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
@@ -161,12 +166,16 @@ void mangaShow::draw_matching(){
 				max_i = s.first;
 			}
 		}
+		CurveDescriptor s_d = CurveDescriptor(seeds[i][max_i], 0.005, 3.0);
 		for (unsigned int j = 1; j < seeds[i][max_i].size(); ++j){
 			cv::line(img_show,
-				cv::Point2d(seeds[i][max_i][j - 1].x * ps, seeds[i][max_i][j - 1].y * -ps) + ds,
-				cv::Point2d(seeds[i][max_i][j].x * ps, seeds[i][max_i][j].y * -ps) + ds,
+				cv::Point2d(s_d.curve[j - 1].x * ps, s_d.curve[j - 1].y * -ps) + ds,
+				cv::Point2d(s_d.curve[j].x * ps, s_d.curve[j].y * -ps) + ds,
 				color_chips(i));
 		}
+		cv::circle(img_show, cv::Point2d(s_d.curve[get_notable_index(s_d, is_cur[i])].x * ps, s_d.curve[get_notable_index(s_d, is_cur[i])].y * -ps) + ds, 2, black, CV_FILLED);
+		fprintf(out_notable, "%lf %lf\n", s_d.curve[get_notable_index(s_d, is_cur[i])].x, s_d.curve[get_notable_index(s_d, is_cur[i])].y);
+
 	}
 	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
 	cv::imwrite("results/canvas.png", canvas);
@@ -179,9 +188,13 @@ void mangaShow::draw_matching(){
 				cv::Point2d(sampleFace.sample_curves[i][j].x * ps, sampleFace.sample_curves[i][j].y * -ps) + ds,
 				color_chips(i));
 		}
+		cv::circle(sample_show, cv::Point2d(sampleFace.sample_curves[i][get_notable_index(sampleFace_CD[i], is_cur[i])].x * ps, sampleFace.sample_curves[i][get_notable_index(sampleFace_CD[i], is_cur[i])].y * -ps) + ds, 2, black, CV_FILLED);
+		fprintf(out_notable, "%lf %lf\n", sampleFace.sample_curves[i][get_notable_index(sampleFace_CD[i], is_cur[i])].x, sampleFace.sample_curves[i][get_notable_index(sampleFace_CD[i], is_cur[i])].y);
 	}
 	cv::resize(sample_show, sample_canvas, cv::Size(sample_show.cols * scale, sample_show.rows * scale));
 	cv::imwrite("results/sample_canvas.png", sample_canvas);
+
+	fclose(out_notable);
 
 	return;
 }
@@ -193,7 +206,7 @@ void mangaShow::draw_graph(){
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 	for (const cv::Point2d &p : mangaFace.graph_pnts){
 		for (const cv::Point2d &q : mangaFace.graph[p]){
-			cv::line(img_show, cv::Point2d(p.x * ps, p.y * -ps) + ds, cv::Point2d(q.x * ps, q.y * -ps) + ds, green);
+			cv::line(img_show, cv::Point2d(p.x * ps, p.y * -ps) + ds, cv::Point2d(q.x * ps, q.y * -ps) + ds, lime);
 		}
 	}
 
@@ -201,7 +214,7 @@ void mangaShow::draw_graph(){
 		cv::Scalar draw_color;
 		switch (mangaFace.graph[p].size()){
 			case 1: draw_color = red; break;
-			case 2: draw_color = purple; break;
+			case 2: draw_color = magenta; break;
 			case 3: draw_color = blue; break;
 			case 4: draw_color = yellow; break;
 			default: draw_color = cyan; break;
@@ -306,20 +319,10 @@ std::vector<bool> mangaShow::get_curves_drawable(){
 }
 
 void mangaShow::test(){
-	unsigned int i = 2;
-	bool is_cur[4] = { true, true, true, false };
-	compare_curves_with_primitive(sampleFace.sample_curves[i], i, is_cur[i]);
-	cv::Scalar color[4] = { cyan, blue, purple, red };
-	draw_curves(false);
-	sample_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
-	draw_sample_face();
-	draw_sample_face(i, color[i]);
-	cv::imwrite("results/sample_canvas.png", sample_canvas);
 }
 
 cv::Scalar mangaShow::color_chips(int i){
-	std::vector<cv::Scalar> color =
-		std::vector<cv::Scalar>{red, yellow, lime, cyan, blue, magenta, maroon, olive, green, teal, navy, purple, orange, turquoise, azure, mauve, violet};
+	std::vector<cv::Scalar> color = deep_color().color_chips;
 	if (i < color.size()) return color[i];
 	return cv::Scalar(rng.uniform(50, 230), rng.uniform(50, 230), rng.uniform(50, 230));
 }
@@ -371,9 +374,9 @@ std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, st
 
 	double a_ratio = curve_length(a) / cv::norm(a[0] - a[a.size() - 1]);
 
-	CurveDescriptor a_d = CurveDescriptor(a, 3.0, true);
+	CurveDescriptor a_d = CurveDescriptor(a);
 	if (a_d.is_error()) return std::vector<cv::Point2d>();
-	CurveDescriptor b_d = CurveDescriptor(b, 3.0, true);
+	CurveDescriptor b_d = CurveDescriptor(b, 0.005, 3.0);
 	if (b_d.is_error()) return std::vector<cv::Point2d>();
 
 	unsigned int a_notable_index = get_notable_index(a_d, is_c);

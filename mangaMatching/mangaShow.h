@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include <limits>
 
+#include "color_chips.h"
 #include "GraphFile.h"
 #include "CurveDescriptor.h"
 
@@ -85,20 +86,6 @@ private:
 	cv::Scalar white = cv::Scalar(255, 255, 255);
 	cv::Scalar gray = cv::Scalar(128, 128, 128);
 	cv::Scalar black = cv::Scalar(0, 0, 0);
-
-	cv::Scalar maroon = cv::Scalar(0, 0, 128);
-	cv::Scalar olive = cv::Scalar(0, 128, 128);
-	cv::Scalar green = cv::Scalar(0, 128, 0);
-	cv::Scalar teal = cv::Scalar(128, 128, 0);
-	cv::Scalar navy = cv::Scalar(128, 0, 0);
-	cv::Scalar purple = cv::Scalar(128, 0, 128);
-
-	cv::Scalar brown = cv::Scalar(42, 42, 165);
-	cv::Scalar orange = cv::Scalar(0, 165, 255);
-	cv::Scalar turquoise = cv::Scalar(200, 213, 48);
-	cv::Scalar azure = cv::Scalar(255, 127, 0);
-	cv::Scalar mauve = cv::Scalar(255, 64, 102);
-	cv::Scalar violet = cv::Scalar(255, 0, 139);
 
 	cv::Scalar color_chips(int i);
 	

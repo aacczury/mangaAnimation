@@ -53,6 +53,9 @@
     <ClInclude Include="GraphFile.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="color_chips.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="showLine.resx">

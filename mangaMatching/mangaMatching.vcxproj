@@ -80,6 +80,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CmCurveEx.h" />
+    <ClInclude Include="color_chips.h" />
     <ClInclude Include="CurveDescriptor.h" />
     <ClInclude Include="GraphFile.h" />
     <ClInclude Include="mangaShow.h" />

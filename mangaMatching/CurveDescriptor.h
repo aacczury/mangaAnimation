@@ -9,7 +9,7 @@
 class CurveDescriptor{
 public:
 	CurveDescriptor();
-	CurveDescriptor(std::vector<cv::Point2d> c, double s, bool is_open);
+	CurveDescriptor(std::vector<cv::Point2d> c, double s = 3.0, bool is_open = true);
 	CurveDescriptor(std::vector<cv::Point2d> c, double sample_length, double s = 3.0, bool is_open = true);
 	CurveDescriptor(std::vector<cv::Point2d> c, unsigned int sample_num, double s = 3.0, bool is_open = true);
 
