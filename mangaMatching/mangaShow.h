@@ -4,6 +4,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/video/video.hpp>
 
 #include <iostream>
 #include <string>
@@ -11,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <limits>
+#include <time.h>
 
 #include "color_chips.h"
 #include "GraphFile.h"
@@ -57,7 +59,7 @@ public:
 	Bitmap ^get_sample_canvas_Bitmap();
 	std::vector<bool> get_curves_drawable();
 
-	void test();
+	void test(char *);
 
 private:
 

@@ -171,6 +171,7 @@ namespace mangaMatching {
 					 System::String ^imgExt = ".jpg|.png|.bmp|.jpeg|.gif";
 					 System::String ^graphExt = ".graph";
 					 System::String ^curveExt = ".curve";
+					 System::String ^txtExt = ".txt";
 					 try{
 						 for (int i = 0; i < files->Length; ++i){
 							 System::String ^ext = Path::GetExtension(files[i]);
@@ -189,6 +190,10 @@ namespace mangaMatching {
 								 ms.read_graph(fileName, SAMPLE_FACE);
 								 this->curve_label->BackColor = System::Drawing::Color::Green;
 								 //ms.calculate_curve();
+							 }
+							 else if (txtExt->IndexOf(ext) >= 0){
+								 char *fileName = (char*)System::Runtime::InteropServices::Marshal::StringToHGlobalAnsi(files[i]).ToPointer();
+								 ms.test(fileName);
 							 }
 						 }
 
