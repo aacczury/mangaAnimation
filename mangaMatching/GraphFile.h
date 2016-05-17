@@ -30,14 +30,25 @@ public:
 	std::unordered_set<cv::Point2d> end_pnts;
 	std::unordered_set<cv::Point2d> junction_pnts;
 	std::vector<std::vector<cv::Point2d>> curves, sample_curves;
+	std::vector<std::vector<cv::Point2d>> cycles, sample_cycles;
+	std::vector<std::vector<unsigned int>> junction_cycles;
 	std::unordered_map<cv::Point2d, std::vector<unsigned int>> pnt_to_curve;
+
+	std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> junction_map;
+	std::unordered_map<unsigned int, std::unordered_set<unsigned int>> path_map;
 
 private:
 	void read_file(char *);
 	void build_curves();
 	void build_pnt_to_curve();
+	void build_path_map();
 
-	std::vector<cv::Point2d> link_curve(cv::Point2d p, cv::Point2d q, std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> &pnts_used_pnts);
+	std::vector<cv::Point2d> link_curve(cv::Point2d p, cv::Point2d &q, std::unordered_map<cv::Point2d, std::unordered_set<cv::Point2d>> &pnts_used_pnts);
+	void find_cycle(std::unordered_map<cv::Point2d, bool> visited_pnts);
+	void find_junction_cycle();
+
+	std::vector<unsigned int> bt;
+	void backtrack_cycle(cv::Point2d p, cv::Point2d q, unsigned int idx, unsigned int depth, unsigned int max_depth);
 };
 
 #endif

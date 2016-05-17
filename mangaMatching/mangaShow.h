@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <limits>
+#include <numeric>
 #include <time.h>
 
 #include "color_chips.h"
@@ -45,7 +46,7 @@ public:
 	void draw_matching();
 
 	void draw_graph();
-	void draw_sample_face(int sample = -1, cv::Scalar color = cv::Scalar(125, 125, 125));
+	void draw_sample_face(int sample = -1, cv::Scalar color = cv::Scalar(125, 125, 125), bool is_open = true);
 	void rng_curves_color();
 	void set_curves_drawable(int index = -1, bool is_draw = true);
 	void draw_curves(bool is_colorful = true);
@@ -63,6 +64,14 @@ public:
 
 private:
 
+	typedef struct mgd{
+		double diff;
+		unsigned int i, j;
+		std::vector<double> gd;
+		mgd(){ diff = 0, i = 0, j = 0; gd.clear(); }
+	} mgd;
+	struct mgd_cmp{ bool operator()(mgd const &a, mgd const &b){ return a.diff < b.diff; }; };
+
 	int scale = 3;
 	cv::RNG rng = cv::RNG(1234);
 	cv::Mat img_read;
@@ -73,11 +82,10 @@ private:
 
 	GraphFile mangaFace, sampleFace;
 	std::vector<CurveDescriptor> mangaFace_CD, sampleFace_CD;
+	std::vector<bool> prim_is_open;
 	std::vector<std::vector<std::vector<cv::Point2d>>> seeds;
-	std::vector<std::unordered_map<unsigned int, double>> geo_score;
+	std::vector<unsigned int> optimal_seed;
 
-	std::vector<std::vector<double>> primitive_relative_angles;
-	
 	cv::Scalar red = cv::Scalar(0, 0, 255);
 	cv::Scalar yellow = cv::Scalar(0, 255, 255);
 	cv::Scalar lime = cv::Scalar(0, 255, 0);
@@ -90,13 +98,20 @@ private:
 	cv::Scalar black = cv::Scalar(0, 0, 0);
 
 	cv::Scalar color_chips(int i);
-	
+
 	unsigned int get_notable_index(CurveDescriptor a, int is_c);
 	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
 	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, int is_c);
 	void compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i, int is_c);
 	void remove_duplication_seed(unsigned int p_i);
+	void simplify_seed(unsigned int p_i);
 	void compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i, int is_c);
+	void compare_cycles_with_primitive(std::vector<cv::Point2d> sample_cycle, unsigned int p_i);
+
+	std::vector<std::vector<unsigned int>> build_relative_table(std::vector<std::vector<mgd>> &, std::vector<std::vector<unsigned int>> &, std::vector<unsigned int> &, unsigned int out_i);
+	std::vector<std::unordered_map<unsigned int, unsigned int>> calculate_seed_use_count(std::vector<std::vector<unsigned int>> &);
+	std::vector<unsigned int> calculate_prim_score(std::vector<std::vector<unsigned int>> &, std::vector<std::unordered_map<unsigned int, unsigned int>> &);
+	unsigned int get_max_count_seed(std::vector<std::unordered_map<unsigned int, unsigned int>> &, unsigned int);
 
 	std::vector<double> calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
 	double calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
@@ -105,7 +120,7 @@ private:
 
 	template<typename T> // type:Mat type ex: uchar(0), i: row, j: col, c: channel
 	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0);
-	double curve_length(std::vector<cv::Point2d> curve);
+	double curve_length(std::vector<cv::Point2d> curve, bool is_open = true);
 	cv::Point2d get_midpoint(cv::Point2d a, cv::Point2d b);
 	cv::Point2d get_midpoint(std::vector<cv::Point2d> pnts);
 	double perpendicular_distance(cv::Point2d p, cv::Point2d p1, cv::Point2d p2);

@@ -36,16 +36,20 @@ CurveDescriptor::CurveDescriptor(std::vector<cv::Point2d> c, double sample_lengt
 	assert(M % 2 == 1);
 	gaussian_derivs();
 
+	if (!is_open && c.back() != c[0]) c.push_back(c[0]);
 	curve = sampling_curve(c, sample_length);
+	if (!is_open) curve.pop_back();
 	if (curve.size() <= 3){
 		too_short_error = true;
 		return;
 	}
+
 	if (is_open){
 		border_curve = bordering_curve(curve);
 		curve_gaussian(border_curve, c_gp, c_dgp, c_ddgp, is_open);
 	}
 	else curve_gaussian(curve, c_gp, c_dgp, c_ddgp, is_open);
+
 	smooth_curve = c_gp;
 	curvature = curve_curvature(curve, c_dgp, c_ddgp); // abs curvature
 }
