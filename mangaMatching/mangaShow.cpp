@@ -6,7 +6,10 @@ bool p_y_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.y < b.y; }
 
 int is_cur[12] = { 1, 1, 1, 1, 2, 3, 3, 1, 1, 1, 1, 1 };
 double graph_sample = 0.005;
-double sample_sample = 0.004;
+double sample_sample = 0.005;
+double max_r_thresh = 0.5;
+double scale_max = 1.4;
+double scale_inter = 0.4;
 
 mangaShow::mangaShow(){
 	img_read = img_show = canvas = cv::Mat();
@@ -91,7 +94,7 @@ std::vector<std::vector<unsigned int>> mangaShow::build_relative_table(std::vect
 	for (unsigned int i = 0; i < n; ++i) relative_table[i].resize(n);
 
 	for (unsigned int i = 0; i < n; ++i){
-		draw_curves(false);
+		//draw_curves(false);
 		CurveDescriptor s_d = CurveDescriptor(seeds[i][max_i[i]], graph_sample, 3.0);
 		for (unsigned int j = 1; j < s_d.curve.size(); ++j){
 			cv::line(img_show,
@@ -132,9 +135,9 @@ std::vector<std::vector<unsigned int>> mangaShow::build_relative_table(std::vect
 		}
 
 		char can[100];
-		sprintf(can, "results/max_prim_%u_%u.png", out_i, i);
+		sprintf(can, "results/prim_%u_%u.png", out_i, i);
 		cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
-		cv::imwrite(can, canvas);
+		//cv::imwrite(can, canvas);
 	}
 
 	return relative_table;
@@ -199,7 +202,6 @@ void mangaShow::relative_seed(){
 			a_r_a.push_back(calculate_center_mass_distance(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]));
 			a_r_a.push_back(calculate_center_mass_angle(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]));
 			a_r_a.push_back(calculate_inner_distance(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]));
-
 			std::vector<mgd> gd_vec;
 			// TODO: no seed error
 			start_t = clock();
@@ -241,13 +243,15 @@ void mangaShow::relative_seed(){
 			for (unsigned int i = 0; i < gd_vec.size(); ++i){
 				gd_vec[i].diff = 0;
 				for (unsigned int j = 0; j < a_r_a.size(); ++j){
-					gd_vec[i].diff += (abs(gd_vec[i].gd[j] - a_r_a[j]) - n_m[j]) / (n_M[j] - n_m[j]);
+					if (n_M[j] - n_m[j] < 0.0000001) gd_vec[i].diff += 0;
+					else gd_vec[i].diff += (abs(gd_vec[i].gd[j] - a_r_a[j]) - n_m[j]) / (n_M[j] - n_m[j]);
 				}
+				if (seeds[t1][gd_vec[i].i] == seeds[t2][gd_vec[i].j]) gd_vec[i].diff = 100000;
 			}
 
 			std::sort(gd_vec.begin(), gd_vec.end(), mgd_cmp());
 
-			for (unsigned int i = 0; i < 5; ++i){
+			for (unsigned int i = 0; i < 5 && i < gd_vec.size(); ++i){
 				if (geo_score[t1].find(gd_vec[i].i) == geo_score[t1].end())
 					geo_score[t1][gd_vec[i].i] = 10 - i * 2;
 				else
@@ -257,12 +261,12 @@ void mangaShow::relative_seed(){
 					geo_score[t2][gd_vec[i].j] = 10 - i * 2;
 				else
 					geo_score[t2][gd_vec[i].j] += 10 - i * 2;
-				                                                                                                                        
-				draw_curves(false);
-				draw_relative_seed(t1, t2, gd_vec[i].i, gd_vec[i].j, lime, red);
-				char filename[100];
-				sprintf(filename, "results/canvas_%d_%d_%d.png", t1, t2, i);
-				cv::imwrite(filename, canvas);
+                                                       
+				//draw_curves(false);
+				//draw_relative_seed(t1, t2, gd_vec[i].i, gd_vec[i].j, lime, red);
+				//char filename[100];
+				//sprintf(filename, "results/relative_%d_%d_%d.png", t1, t2, i);
+				//cv::imwrite(filename, canvas);
 			}
 
 			gd_idx[t1][t2] = gd_idx[t2][t1] = all_gd.size();
@@ -278,7 +282,7 @@ void mangaShow::relative_seed(){
 	} gs;
 	struct gs_cmp{ bool operator()(gs const &a, gs const &b){ return a.score > b.score; }; };
 
-	std::vector<unsigned int> now_seed;
+	std::vector<unsigned int> now_seed, max_prim_seed;
 	now_seed.resize(n);
 	std::vector<std::vector<gs>> prim_gs;
 	prim_gs.resize(n);
@@ -298,7 +302,7 @@ void mangaShow::relative_seed(){
 	std::vector<unsigned int> prim_score;
 	std::vector<unsigned int>::iterator max_prim, min_prim;
 	unsigned int prev_prim = 0, prim_idx = 0, it_count = 0;
-	unsigned int max_prim_score = 0;
+	unsigned int max_prim_score = 0, this_prim_max_score = 0;
 	for (unsigned int i = 0; i < 30; ++ i){
 		relative_table = build_relative_table(all_gd, gd_idx, now_seed, i);
 		seed_use_count = calculate_seed_use_count(relative_table);
@@ -319,14 +323,42 @@ void mangaShow::relative_seed(){
 			}
 		}
 		
-		if (prev_prim != min_prim - prim_score.begin()) prim_idx = 0;
+		if (prev_prim != min_prim - prim_score.begin()){
+			prim_idx = 0;
+			this_prim_max_score = now_score;
+		}
+		else{
+			if (this_prim_max_score > now_score){
+				this_prim_max_score = now_score;
+				max_prim_seed = optimal_seed;
+			}
+		}
+	
 		if (prim_idx >= prim_gs[min_prim - prim_score.begin()].size()){
 			printf("%u / %u\n", prim_idx, prim_gs[min_prim - prim_score.begin()].size());
+			//optimal_seed = max_prim_seed;
 			break;
 		}
 		now_seed[min_prim - prim_score.begin()] = prim_gs[min_prim - prim_score.begin()][prim_idx++].idx;
 		prev_prim = min_prim - prim_score.begin();
 	}
+
+	double relative_diff = 0;
+	for (unsigned int i = 0; i < n; ++i){
+		for (unsigned int j = 0; j < n; ++j){
+			if (i == j) continue;
+			std::vector<mgd> gd_vec = all_gd[gd_idx[i][j]]; // have sorted
+			unsigned int min_i = 0;
+			for (unsigned int k = 0; k < gd_vec.size(); ++k){
+				if (i < j && optimal_seed[i] == gd_vec[k].i && optimal_seed[j] == gd_vec[k].j ||
+					i > j && optimal_seed[i] == gd_vec[k].j && optimal_seed[j] == gd_vec[k].i){
+					relative_diff += gd_vec[k].diff;
+					printf("==> %u <-> %u\n", i, j);
+				}
+			}
+		}
+	}
+	printf("=> relative diff = %lf\n", relative_diff);
 	
 	return;
 }
@@ -336,7 +368,7 @@ void mangaShow::draw_matching(){
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 
 	FILE *out_notable = fopen("results/notable.txt", "w");
-	fprintf(out_notable, "%d\n", sampleFace.sample_curves.size());
+	fprintf(out_notable, "%d\n", sampleFace.sample_curves.size() + sampleFace.sample_cycles.size());
 
 	draw_curves(false);
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size() + sampleFace.sample_cycles.size(); ++i){
@@ -631,7 +663,7 @@ std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, st
 	unsigned int a_notable_index = get_notable_index(a_d, is_c);
 	double a_degree = abc_degree(a[0], a[a_notable_index], a[a.size() - 1]);
 
-	for (double i = 1; i <= 1.8; i += 0.4){
+	for (double i = 1; i <= scale_max; i += scale_inter){
 		segment.clear();
 		if (a_d.curvature.size() / i <= 3) return std::vector<cv::Point2d>();
 		b_d.scaling_curvature(i);
@@ -860,7 +892,7 @@ void mangaShow::compare_cycles_with_primitive(std::vector<cv::Point2d> sample_cy
 		double b_perimeter = curve_length(cycle, false);
 		double b_max_r = 0;
 		for (const cv::Point2d p : cycle) b_max_r = std::max(b_max_r, cv::norm(p - b_mass));
-		if (abs(b_max_r / a_max_r - 1) < 0.3) seeds[p_i].push_back(cycle);
+		if (abs(b_max_r / a_max_r - 1) < max_r_thresh) seeds[p_i].push_back(cycle);
 	}
 
 	for (unsigned int i = 0; i < mangaFace.junction_cycles.size(); ++i){
@@ -887,7 +919,7 @@ void mangaShow::compare_cycles_with_primitive(std::vector<cv::Point2d> sample_cy
 		double b_perimeter = curve_length(cycle, false);
 		double b_max_r = 0;
 		for (const cv::Point2d p : cycle) b_max_r = std::max(b_max_r, cv::norm(p - b_mass));
-		if (abs(b_max_r / a_max_r - 1) < 0.3) seeds[p_i].push_back(cycle);
+		if (abs(b_max_r / a_max_r - 1) < max_r_thresh) seeds[p_i].push_back(cycle);
 	}
 	return;
 }
@@ -967,7 +999,7 @@ double mangaShow::calculate_inner_distance(CurveDescriptor a, CurveDescriptor b,
 	cv::Point2d a_npt, b_npt;
 	if (a_c == 3) a_npt = get_midpoint(a.curve);
 	else a_npt = a.curve[get_notable_index(a, a_c)];
-	if (b_c == 3) a_npt = get_midpoint(b.curve);
+	if (b_c == 3) b_npt = get_midpoint(b.curve);
 	else b_npt = b.curve[get_notable_index(b, b_c)];
 
 	return cv::norm(a_npt - b_npt);
