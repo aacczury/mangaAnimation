@@ -123,11 +123,8 @@ void GraphFile::backtrack_cycle(cv::Point2d p, cv::Point2d q, unsigned int idx, 
 			min_i = jc.size() - 1 - min_i;
 		}
 		std::rotate(jc.begin(), jc.begin() + min_i, jc.end());
-		if (std::find(junction_cycles.begin(), junction_cycles.end(), jc) == junction_cycles.end()){
+		if (std::find(junction_cycles.begin(), junction_cycles.end(), jc) == junction_cycles.end())
 			junction_cycles.push_back(jc);
-			for (const unsigned int i : jc) printf("%u ", i);
-			printf("\n");
-		}
 		return;
 	};
 	for (const auto next_idx : path_map[idx])

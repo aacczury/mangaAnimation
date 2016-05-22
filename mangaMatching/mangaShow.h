@@ -100,6 +100,7 @@ private:
 	cv::Scalar color_chips(int i);
 
 	unsigned int get_notable_index(CurveDescriptor a, int is_c);
+	cv::Point2d get_notable_pnt(CurveDescriptor a, int is_c);
 	int normalize_cross_correlation(std::vector<double> a, std::vector<double> b);
 	std::vector<cv::Point2d> compare_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, int is_c);
 	void compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b, unsigned int p_i, int is_c);
@@ -113,14 +114,12 @@ private:
 	std::vector<unsigned int> calculate_prim_score(std::vector<std::vector<unsigned int>> &, std::vector<std::unordered_map<unsigned int, unsigned int>> &);
 	unsigned int get_max_count_seed(std::vector<std::unordered_map<unsigned int, unsigned int>> &, unsigned int);
 
-	std::vector<double> calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
-	double calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
-	double calculate_center_mass_angle(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
-	double calculate_inner_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
+	std::vector<double> calculate_relative(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c);
 
 	template<typename T> // type:Mat type ex: uchar(0), i: row, j: col, c: channel
 	T &ref_Mat_val(cv::Mat &m, T type, cv::Point p, int c = 0);
 	double curve_length(std::vector<cv::Point2d> curve, bool is_open = true);
+	std::vector<cv::Point2d> join_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b);
 	cv::Point2d get_midpoint(cv::Point2d a, cv::Point2d b);
 	cv::Point2d get_midpoint(std::vector<cv::Point2d> pnts);
 	double perpendicular_distance(cv::Point2d p, cv::Point2d p1, cv::Point2d p2);

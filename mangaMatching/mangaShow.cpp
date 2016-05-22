@@ -7,9 +7,9 @@ bool p_y_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.y < b.y; }
 int is_cur[12] = { 1, 1, 1, 1, 2, 3, 3, 1, 1, 1, 1, 1 };
 double graph_sample = 0.005;
 double sample_sample = 0.005;
-double max_r_thresh = 0.5;
-double scale_max = 1.4;
-double scale_inter = 0.4;
+double max_r_thresh = 0.6;
+double scale_max = 1.8;
+double scale_inter = 0.8;
 
 mangaShow::mangaShow(){
 	img_read = img_show = canvas = cv::Mat();
@@ -61,7 +61,7 @@ void mangaShow::find_seed(){
 
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
 		compare_curves_with_primitive(sampleFace.sample_curves[i], i, is_cur[i]);
-		printf("=> Find %d Seeds: %d\n", i, seeds[i].size());
+		printf("%d Seeds: %d\n", i, seeds[i].size());
 		draw_curves(false);
 		sample_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
 		draw_sample_face(i, color_chips(i));
@@ -95,14 +95,15 @@ std::vector<std::vector<unsigned int>> mangaShow::build_relative_table(std::vect
 
 	for (unsigned int i = 0; i < n; ++i){
 		//draw_curves(false);
-		CurveDescriptor s_d = CurveDescriptor(seeds[i][max_i[i]], graph_sample, 3.0);
-		for (unsigned int j = 1; j < s_d.curve.size(); ++j){
-			cv::line(img_show,
-				cv::Point2d(s_d.curve[j - 1].x * ps, s_d.curve[j - 1].y * -ps) + ds,
-				cv::Point2d(s_d.curve[j].x * ps, s_d.curve[j].y * -ps) + ds,
-				color_chips(i));
-		}
-		cv::circle(img_show, cv::Point2d(s_d.curve[get_notable_index(s_d, is_cur[i])].x * ps, s_d.curve[get_notable_index(s_d, is_cur[i])].y * -ps) + ds, 2, black, CV_FILLED);
+		//CurveDescriptor s_d = CurveDescriptor(seeds[i][max_i[i]], graph_sample, 3.0);
+		//for (unsigned int j = 1; j < s_d.curve.size(); ++j){
+		//	cv::line(img_show,
+		//		cv::Point2d(s_d.curve[j - 1].x * ps, s_d.curve[j - 1].y * -ps) + ds,
+		//		cv::Point2d(s_d.curve[j].x * ps, s_d.curve[j].y * -ps) + ds,
+		//		color_chips(i));
+		//}
+		//cv::Point2d notable_pnt = get_notable_pnt(s_d, is_cur[i]);
+		//cv::circle(img_show, cv::Point2d(notable_pnt.x * ps, notable_pnt.y * -ps) + ds, 2, black, CV_FILLED);
 		
 		relative_table[i][i] = max_i[i];
 
@@ -122,21 +123,22 @@ std::vector<std::vector<unsigned int>> mangaShow::build_relative_table(std::vect
 					break;
 				}
 			}
-
-			s_d = CurveDescriptor(seeds[j][min_i], graph_sample, 3.0);
-			for (unsigned int k = 1; k < s_d.curve.size(); ++k){
-				cv::line(img_show,
-					cv::Point2d(s_d.curve[k - 1].x * ps, s_d.curve[k - 1].y * -ps) + ds,
-					cv::Point2d(s_d.curve[k].x * ps, s_d.curve[k].y * -ps) + ds,
-					color_chips(j));
-			}
-			cv::circle(img_show, cv::Point2d(s_d.curve[get_notable_index(s_d, is_cur[j])].x * ps, s_d.curve[get_notable_index(s_d, is_cur[j])].y * -ps) + ds, 2, black, CV_FILLED);
+		
+		//	s_d = CurveDescriptor(seeds[j][min_i], graph_sample, 3.0);
+		//	for (unsigned int k = 1; k < s_d.curve.size(); ++k){
+		//		cv::line(img_show,
+		//			cv::Point2d(s_d.curve[k - 1].x * ps, s_d.curve[k - 1].y * -ps) + ds,
+		//			cv::Point2d(s_d.curve[k].x * ps, s_d.curve[k].y * -ps) + ds,
+		//			color_chips(j));
+		//	}
+		//	cv::Point2d notable_pnt = get_notable_pnt(s_d, is_cur[j]);
+		//	cv::circle(img_show, cv::Point2d(notable_pnt.x * ps, notable_pnt.y * -ps) + ds, 2, black, CV_FILLED);
 			relative_table[i][j] = min_i;
 		}
-
-		char can[100];
-		sprintf(can, "results/prim_%u_%u.png", out_i, i);
-		cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
+		
+		//char can[100];
+		//sprintf(can, "results/prim_%u_%u.png", out_i, i);
+		//cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
 		//cv::imwrite(can, canvas);
 	}
 
@@ -198,10 +200,8 @@ void mangaShow::relative_seed(){
 	geo_score.resize(n);
 	for (unsigned int t1 = 0; t1 < n; ++t1){
 		for (unsigned int t2 = t1 + 1; t2 < n; ++t2){
-			std::vector<double> a_r_a = calculate_relative_angles(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]);
-			a_r_a.push_back(calculate_center_mass_distance(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]));
-			a_r_a.push_back(calculate_center_mass_angle(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]));
-			a_r_a.push_back(calculate_inner_distance(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]));
+			std::vector<double> a_r_a = calculate_relative(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]);
+
 			std::vector<mgd> gd_vec;
 			// TODO: no seed error
 			start_t = clock();
@@ -212,10 +212,7 @@ void mangaShow::relative_seed(){
 					CurveDescriptor b_d = CurveDescriptor(seeds[t2][j], graph_sample, 3.0);
 					if (b_d.is_error()) continue;
 
-					std::vector<double> b_r_a = calculate_relative_angles(a_d, b_d, is_cur[t1], is_cur[t2]);
-					b_r_a.push_back(calculate_center_mass_distance(a_d, b_d, is_cur[t1], is_cur[t2]));
-					b_r_a.push_back(calculate_center_mass_angle(a_d, b_d, is_cur[t1], is_cur[t2]));
-					b_r_a.push_back(calculate_inner_distance(a_d, b_d, is_cur[t1], is_cur[t2]));
+					std::vector<double> b_r_a = calculate_relative(a_d, b_d, is_cur[t1], is_cur[t2]);
 
 					mgd gd = mgd();
 					gd.gd = b_r_a;
@@ -379,9 +376,7 @@ void mangaShow::draw_matching(){
 				cv::Point2d(s_d.curve[j].x * ps, s_d.curve[j].y * -ps) + ds,
 				color_chips(i));
 		}
-		cv::Point2d npt;
-		if (is_cur[i] == 3) npt = get_midpoint(s_d.curve);
-		else npt = s_d.curve[get_notable_index(s_d, is_cur[i])];
+		cv::Point2d npt = get_notable_pnt(s_d, is_cur[i]);
 		cv::circle(img_show, cv::Point2d(npt.x * ps, npt.y * -ps) + ds, 2, black, CV_FILLED);
 		fprintf(out_notable, "%lf %lf\n", npt.x, npt.y);
 	}
@@ -396,7 +391,7 @@ void mangaShow::draw_matching(){
 				cv::Point2d(sampleFace.sample_curves[i][j].x * ps, sampleFace.sample_curves[i][j].y * -ps) + ds,
 				color_chips(i));
 		}
-		cv::Point2d npt = sampleFace.sample_curves[i][get_notable_index(sampleFace_CD[i], is_cur[i])];
+		cv::Point2d npt = get_notable_pnt(sampleFace.sample_curves[i], is_cur[i]);
 		cv::circle(sample_show, cv::Point2d(npt.x * ps, npt.y * -ps) + ds, 2, black, CV_FILLED);
 		fprintf(out_notable, "%lf %lf\n", npt.x, npt.y);
 	}
@@ -497,18 +492,7 @@ void mangaShow::draw_curves(bool is_colorful){
 				is_colorful ? curves_color[i] : gray);
 		}
 	}
-	//for (unsigned int i = 0; i < mangaFace.junction_cycles.size(); ++i){
-	//	for (unsigned int j = 0; j < mangaFace.junction_cycles[i].size(); ++j){
-	//		for (unsigned int k = 1; k < mangaFace.sample_curves[mangaFace.junction_cycles[i][j]].size(); ++k){
-	//			if (curves_drawable[mangaFace.junction_cycles[i][j]]){
-	//				cv::Point2d p1 = mangaFace.sample_curves[mangaFace.junction_cycles[i][j]][k - 1];
-	//				cv::Point2d p2 = mangaFace.sample_curves[mangaFace.junction_cycles[i][j]][k];
-	//				cv::line(img_show,
-	//					cv::Point2d(p1.x * ps, p1.y * -ps) + ds, cv::Point2d(p2.x * ps, p2.y * -ps) + ds, cyan);
-	//			}
-	//		}
-	//	}
-	//}
+
 	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
 	cv::imwrite("results/curves.png", canvas);
 
@@ -617,6 +601,16 @@ unsigned int mangaShow::get_notable_index(CurveDescriptor a, int is_c){
 	}
 }
 
+cv::Point2d mangaShow::get_notable_pnt(CurveDescriptor a, int is_c){
+	if (is_c == 3) return get_midpoint(a.curve);
+	else{
+		unsigned int idx = get_notable_index(a, is_c);
+		if (idx == 0 || idx == a.curve.size() - 1)
+			printf("Warning: notable point is end point.\n");
+		return a.curve[idx];
+	}
+}
+
 int mangaShow::normalize_cross_correlation(std::vector<double> a, std::vector<double> b){
 	double max_v = 0;
 	unsigned int offset = 0;
@@ -660,8 +654,8 @@ std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, st
 	CurveDescriptor b_d = CurveDescriptor(b);
 	if (b_d.is_error()) return std::vector<cv::Point2d>();
 
-	unsigned int a_notable_index = get_notable_index(a_d, is_c);
-	double a_degree = abc_degree(a[0], a[a_notable_index], a[a.size() - 1]);
+	cv::Point2d a_notable_pnt = get_notable_pnt(a_d, is_c);
+	double a_degree = abc_degree(a_d.curve.front(), a_notable_pnt, a_d.curve.back());
 
 	for (double i = 1; i <= scale_max; i += scale_inter){
 		segment.clear();
@@ -684,8 +678,8 @@ std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, st
 		
 		CurveDescriptor s_d = CurveDescriptor(segment, 3.0, true);
 		if (s_d.is_error()) continue;
-		unsigned int b_notable_index = get_notable_index(s_d, is_c);
-		double b_degree = abc_degree(segment[0], segment[b_notable_index], segment[segment.size() - 1]);
+		cv::Point2d b_notable_pnt = get_notable_pnt(s_d, is_c);
+		double b_degree = abc_degree(s_d.curve.front(), b_notable_pnt, s_d.curve.back());
 		if ((a_degree - CV_PI / 8 > b_degree) ||
 			(a_degree + CV_PI / 8 < b_degree)) continue;
 		
@@ -784,6 +778,14 @@ void mangaShow::simplify_seed(unsigned int p_i){
 	return;
 }
 
+std::vector<cv::Point2d> mangaShow::join_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b){
+	if (a.front() == b.front() || a.front() == b.back()) std::reverse(a.begin(), a.end());
+	if (a.back() == b.back()) std::reverse(b.begin(), b.end());
+	std::vector<cv::Point2d> c = a;
+	c.insert(c.end(), b.begin() + 1, b.end());
+	return c;
+}
+
 // need link curve function
 void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i, int is_c){
 	if (seeds.size() != sampleFace.sample_curves.size() + sampleFace.sample_cycles.size())
@@ -793,50 +795,37 @@ void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_cu
 
 
 	for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
-		if (mangaFace.sample_curves[i].size() == 0) continue;
+		if (mangaFace.sample_curves[i].size() == 0){
+			printf("Warning: manga face curve 0 size\n");
+			continue;
+		}
 
-		std::vector<cv::Point2d> curve;
 		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]].size(); ++j){
 			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]][j];
 			if (a_crv == i || mangaFace.sample_curves[a_crv].size() == 0) continue;
-			curve.clear();
 
-			if (mangaFace.sample_curves[a_crv][0] == mangaFace.sample_curves[i][0])
-				std::reverse(mangaFace.sample_curves[a_crv].begin(), mangaFace.sample_curves[a_crv].end());
-			for (unsigned int k = 0; k < mangaFace.sample_curves[a_crv].size(); ++k) curve.push_back(mangaFace.sample_curves[a_crv][k]);
-			for (unsigned int k = 1; k < mangaFace.sample_curves[i].size(); ++k) curve.push_back(mangaFace.sample_curves[i][k]);
+			std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[a_crv], mangaFace.sample_curves[i]);
 
-			std::vector<cv::Point2d> curve_e;
-			for (unsigned int k = 0; k < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]].size(); ++k){
-				unsigned int b_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]][k];
+			for (unsigned int k = 0; k < mangaFace.pnt_to_curve[mangaFace.sample_curves[i].back()].size(); ++k){
+				unsigned int b_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i].back()][k];
 				if (b_crv == i || mangaFace.sample_curves[b_crv].size() == 0) continue;
-				curve_e = curve;
 
-				if (mangaFace.sample_curves[b_crv][mangaFace.sample_curves[b_crv].size() - 1] == mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1])
-					std::reverse(mangaFace.sample_curves[b_crv].begin(), mangaFace.sample_curves[b_crv].end());
-				for (unsigned int l = 1; l < mangaFace.sample_curves[b_crv].size(); ++l) curve_e.push_back(mangaFace.sample_curves[b_crv][l]);
-				
+				std::vector<cv::Point2d> curve_e = join_curve(curve, mangaFace.sample_curves[b_crv]);
 				compare_curve_add_seed(sample_curve, curve_e, p_i, is_c);
 				curve_is_visited[a_crv] = curve_is_visited[i] = curve_is_visited[b_crv] = true;
 			}
 		}
 	}
-	printf("==> curve 3 ~ done.\n");
+	printf("==> 3, ");
 
 	for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
 		if (curve_is_visited[i] || mangaFace.sample_curves[i].size() == 0) continue;
 
-		std::vector<cv::Point2d> curve;
 		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]].size(); ++j){
 			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]][j];
 			if (a_crv <= i || curve_is_visited[a_crv] || mangaFace.sample_curves[a_crv].size() == 0) continue;
-			curve.clear();
 
-			if (mangaFace.sample_curves[a_crv][0] == mangaFace.sample_curves[i][0])
-				std::reverse(mangaFace.sample_curves[a_crv].begin(), mangaFace.sample_curves[a_crv].end());
-			for (unsigned int k = 0; k < mangaFace.sample_curves[a_crv].size(); ++k) curve.push_back(mangaFace.sample_curves[a_crv][k]);
-			for (unsigned int k = 1; k < mangaFace.sample_curves[i].size(); ++k) curve.push_back(mangaFace.sample_curves[i][k]);
-
+			std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[a_crv], mangaFace.sample_curves[i]);
 			compare_curve_add_seed(sample_curve, curve, p_i, is_c);
 			curve_is_visited[a_crv] = curve_is_visited[i] = true;
 		}
@@ -844,18 +833,13 @@ void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_cu
 		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]].size(); ++j){
 			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]][j];
 			if (a_crv <= i || curve_is_visited[a_crv] || mangaFace.sample_curves[a_crv].size() == 0) continue;
-			curve.clear();
 
-			if (mangaFace.sample_curves[a_crv][mangaFace.sample_curves[a_crv].size() - 1] == mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1])
-				std::reverse(mangaFace.sample_curves[a_crv].begin(), mangaFace.sample_curves[a_crv].end());
-			for (unsigned int k = 0; k < mangaFace.sample_curves[i].size(); ++k) curve.push_back(mangaFace.sample_curves[i][k]);
-			for (unsigned int k = 1; k < mangaFace.sample_curves[a_crv].size(); ++k) curve.push_back(mangaFace.sample_curves[a_crv][k]);
-
+			std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[i], mangaFace.sample_curves[a_crv]);
 			compare_curve_add_seed(sample_curve, curve, p_i, is_c);
 			curve_is_visited[a_crv] = curve_is_visited[i] = true;
 		}
 	}
-	printf("==> curve 2 ~ done.\n");
+	printf("2, ");
 
 	for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
 		if (curve_is_visited[i] || mangaFace.sample_curves[i].size() == 0) continue;
@@ -863,10 +847,10 @@ void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_cu
 		compare_curve_add_seed(sample_curve, mangaFace.sample_curves[i], p_i, is_c);
 		curve_is_visited[i] = true;
 	}
-	printf("==> curve 1 ~ done.\n");
+	printf("1. ");
 
 	remove_duplication_seed(p_i);
-	//simplify_seed(p_i);
+	simplify_seed(p_i);
 	return;
 }
 
@@ -924,85 +908,42 @@ void mangaShow::compare_cycles_with_primitive(std::vector<cv::Point2d> sample_cy
 	return;
 }
 
-std::vector<double> mangaShow::calculate_relative_angles(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
-	std::vector<double> relative_angles;
-	relative_angles.resize(2);
+std::vector<double> mangaShow::calculate_relative(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
+	std::vector<double> relative;
+	relative.resize(5);
 
-	cv::Point2d a_npt, b_npt;
+	cv::Point2d a_npt = get_notable_pnt(a, a_c);
+	cv::Point2d b_npt = get_notable_pnt(b, b_c);
+
 	cv::Point2d t1, t2;
-	if (a_c == 3) a_npt = get_midpoint(a.curve);
-	else{
-		unsigned int a_index = get_notable_index(a, a_c);
-		a_npt = a.curve[a_index];
-		t1 = caculate_tangent(a.curve, a_index);
-	}
-	if (b_c == 3) b_npt = get_midpoint(b.curve);
-	else{
-		unsigned int b_index = get_notable_index(b, b_c);
-		b_npt = b.curve[b_index];
-		t2 = caculate_tangent(b.curve, b_index);
-	}
+	if(a_c != 3) t1 = caculate_tangent(a.curve, get_notable_index(a, a_c));
+	if(b_c != 3) t2 = caculate_tangent(b.curve, get_notable_index(b, b_c));
 	cv::Point2d n1 = b_npt - a_npt;
 	cv::Point2d n2 = -n1;
 
-	if (a_c == 3) relative_angles[0] = 0.5;
-	else relative_angles[0] = (n1.cross(t1) >= 0 ? v_degree(n1, t1) : v_degree(n1, -t1)) / CV_PI;
-	if (b_c == 3) relative_angles[1] = 0.5;
-	else relative_angles[1] = (n2.cross(t2) >= 0 ? v_degree(n2, t2) : v_degree(n2, -t2)) / CV_PI;
-
-	return relative_angles;
-}
-
-double mangaShow::calculate_center_mass_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
-	cv::Point2d a_npt, b_npt;
-	if (a_c == 3) a_npt = get_midpoint(a.curve);
-	else a_npt = a.curve[get_notable_index(a, a_c)];
-	if (b_c == 3) a_npt = get_midpoint(b.curve);
-	else b_npt = b.curve[get_notable_index(b, b_c)];
+	// relative_angle
+	if (a_c == 3) relative[0] = 0.5;
+	else relative[0] = (n1.cross(t1) >= 0 ? v_degree(n1, t1) : v_degree(n1, -t1)) / CV_PI;
+	if (b_c == 3) relative[1] = 0.5;
+	else relative[1] = (n2.cross(t2) >= 0 ? v_degree(n2, t2) : v_degree(n2, -t2)) / CV_PI;
 
 	cv::Point2d c = get_midpoint(a_npt, b_npt);
 	double r = cv::norm(a_npt - c);
 	std::vector<cv::Point2d> pnts_in_circle;
-	for (unsigned int i = 0; i < a.curve.size(); ++i){
+	for (unsigned int i = 0; i < a.curve.size(); ++i)
 		if (cv::norm(a.curve[i] - c) < r) pnts_in_circle.push_back(a.curve[i]);
-	}
-	for (unsigned int i = 0; i < b.curve.size(); ++i){
+	for (unsigned int i = 0; i < b.curve.size(); ++i)
 		if (cv::norm(b.curve[i] - c) < r) pnts_in_circle.push_back(b.curve[i]);
-	}
 	cv::Point2d m = get_midpoint(pnts_in_circle);
 
-	return cv::norm(m - c) / r * ((m - c).cross(a_npt - c) > 0 ? 1 : -1);
-}
+	// center_mass_distance
+	relative[2] = cv::norm(m - c) / r * ((m - c).cross(a_npt - c) > 0 ? 1 : -1);
+	// center_mass_angle
+	relative[3] = v_angle(a_npt - c, m - c) / CV_PI;
+	// distance
+	relative[4] = cv::norm(a_npt - b_npt);
 
-double mangaShow::calculate_center_mass_angle(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
-	cv::Point2d a_npt, b_npt;
-	if (a_c == 3) a_npt = get_midpoint(a.curve);
-	else a_npt = a.curve[get_notable_index(a, a_c)];
-	if (b_c == 3) a_npt = get_midpoint(b.curve);
-	else b_npt = b.curve[get_notable_index(b, b_c)];
-
-	cv::Point2d c = get_midpoint(a_npt, b_npt);
-	double r = cv::norm(a_npt - c);
-	std::vector<cv::Point2d> pnts_in_circle;
-	for (unsigned int i = 0; i < a.curve.size(); ++i){
-		if (cv::norm(a.curve[i] - c) < r) pnts_in_circle.push_back(a.curve[i]);
-	}
-	for (unsigned int i = 0; i < b.curve.size(); ++i){
-		if (cv::norm(b.curve[i] - c) < r) pnts_in_circle.push_back(b.curve[i]);
-	}
-	cv::Point2d m = get_midpoint(pnts_in_circle);
-
-	return v_angle(a_npt - c, m - c) / CV_PI;
-}
-
-double mangaShow::calculate_inner_distance(CurveDescriptor a, CurveDescriptor b, int a_c, int b_c){
-	cv::Point2d a_npt, b_npt;
-	if (a_c == 3) a_npt = get_midpoint(a.curve);
-	else a_npt = a.curve[get_notable_index(a, a_c)];
-	if (b_c == 3) b_npt = get_midpoint(b.curve);
-	else b_npt = b.curve[get_notable_index(b, b_c)];
-
-	return cv::norm(a_npt - b_npt);
+	return relative;
 }
 
 template<typename T>
