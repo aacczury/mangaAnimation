@@ -43,6 +43,8 @@ public:
 
 	void find_seed();
 	void relative_seed();
+	void link_seed();
+	void llink_seed();
 	void draw_matching();
 
 	void draw_graph();
@@ -84,6 +86,9 @@ private:
 	std::vector<CurveDescriptor> mangaFace_CD, sampleFace_CD;
 	std::vector<bool> prim_is_open;
 	std::vector<std::vector<std::vector<cv::Point2d>>> seeds;
+	std::vector<std::vector<mgd>> all_gd;
+	std::vector<std::vector<unsigned int>> gd_idx;
+	std::vector<std::unordered_map<unsigned int, double>> geo_score;
 	std::vector<unsigned int> optimal_seed;
 
 	cv::Scalar red = cv::Scalar(0, 0, 255);

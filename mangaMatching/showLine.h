@@ -205,19 +205,29 @@ namespace mangaMatching {
 						 if (ms.is_read_img() && ms.is_read_mangaFace()){
 							 ms.draw_curves(false);
 							 if (ms.is_read_sampleFace()){
+								 char ostr[100];
+
 								 QueryPerformanceCounter(&start_t);
 								 ms.find_seed();
 								 QueryPerformanceCounter(&end_t);
-								 printf("time cost: %lf\n", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
+								 sprintf(ostr, "ansicon -e [30;43mTime:[0m [1;32mFind Seed[0m cost %lfs.", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
+								 system(ostr);
 
 								 QueryPerformanceCounter(&start_t);
 								 ms.relative_seed();
 								 QueryPerformanceCounter(&end_t);
-								 printf("time cost: %lf\n", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
+								 sprintf(ostr, "ansicon -e [30;43mTime:[0m [1;32mRelative Seed[0m cost %lfs.", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
+								 system(ostr);
 
-								 ms.draw_matching();
-								 //ms.test();
-								 this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
+								 QueryPerformanceCounter(&start_t);
+								 ms.llink_seed();
+								 //ms.link_seed();
+								 QueryPerformanceCounter(&end_t);
+								 sprintf(ostr, "ansicon -e [30;43mTime:[0m [1;32mLink Seed[0m cost %lfs.", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
+								 system(ostr);
+
+								 //ms.draw_matching();
+								 //this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
 							 }
 							 this->showLine_pictureBox->Image = ms.get_canvas_Bitmap();
 

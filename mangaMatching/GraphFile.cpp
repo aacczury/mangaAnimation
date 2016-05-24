@@ -32,7 +32,10 @@ void GraphFile::read_file(char *filename){
 		graph[graph_pnts_vector[q]].insert(graph_pnts_vector[p]);
 	}
 
-	printf("=> Reading %s done.\n", filename);
+	char ostr[100];
+	sprintf(ostr, "ansicon -E [44mReading:[0m ");
+	system(ostr);
+	printf("%s done.\n", filename);
 	return;
 }
 
@@ -82,7 +85,10 @@ void GraphFile::build_curves(){
 	find_cycle(visited_pnts);
 
 	std::sort(curves.begin(), curves.end(), curve_length_cmp);
-	printf("==> Building curves done\n");
+
+	char ostr[100];
+	sprintf(ostr, "ansicon -e [42mLog:[0m Building curves done.");
+	system(ostr);
 	return;
 }
 

@@ -4,12 +4,12 @@ bool point2d_vector_size_cmp(const std::vector<cv::Point2d> &a, const std::vecto
 bool p_x_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.x < b.x; }
 bool p_y_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.y < b.y; }
 
-int is_cur[12] = { 1, 1, 1, 1, 2, 3, 3, 1, 1, 1, 1, 1 };
+int is_cur[12] = { 1, 1, 1, 2, 2, 3, 3, 1, 1, 1, 1, 1 };
 double graph_sample = 0.005;
 double sample_sample = 0.005;
-double max_r_thresh = 0.6;
-double scale_max = 1.8;
-double scale_inter = 0.8;
+double max_r_thresh = 0.4;
+double scale_max = 1.4;
+double scale_inter = 0.4;
 
 mangaShow::mangaShow(){
 	img_read = img_show = canvas = cv::Mat();
@@ -24,7 +24,10 @@ void mangaShow::read_img(char *filename){
 	img_show = img_read.clone();
 	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
 
-	printf("=> Reading image done.\n");
+	char ostr[100];
+	sprintf(ostr, "ansicon -E [44mReading:[0m ");
+	system(ostr);
+	printf("%s done.\n", filename);
 }
 
 void mangaShow::read_graph(char *filename, int g_s){
@@ -38,7 +41,10 @@ void mangaShow::read_graph(char *filename, int g_s){
 			mangaFace.sample_cycles.push_back(CurveDescriptor(mangaFace.cycles[i], graph_sample, 3.0, false).curve);
 		}
 		assert(mangaFace.sample_curves.size() == mangaFace.curves.size());
-		printf("curves size: %u, sample curves size: %u\n", mangaFace.curves.size(), mangaFace.sample_curves.size());
+
+		char ostr[100];
+		sprintf(ostr, "ansicon -e [41mDebug:[0m curves size: %u, sample curves size: %u", mangaFace.curves.size(), mangaFace.sample_curves.size());
+		system(ostr);
 	}
 	else if (g_s == SAMPLE_FACE){
 		sampleFace = GraphFile(filename);
@@ -60,6 +66,9 @@ void mangaShow::find_seed(){
 	seeds.clear();
 
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
+		char ostr[100];
+		sprintf(ostr, "ansicon -E [46mProcess:[0m ");
+		system(ostr);
 		compare_curves_with_primitive(sampleFace.sample_curves[i], i, is_cur[i]);
 		printf("%d Seeds: %d\n", i, seeds[i].size());
 		draw_curves(false);
@@ -71,7 +80,10 @@ void mangaShow::find_seed(){
 	}
 	for (unsigned int i = 0; i < sampleFace.sample_cycles.size(); ++i){
 		compare_cycles_with_primitive(sampleFace.sample_cycles[i], i + sampleFace.sample_curves.size());
-		printf("=> Find %d Seeds (Cycle): %d\n", i + sampleFace.sample_curves.size(), seeds[i + sampleFace.sample_curves.size()].size());
+		char ostr[100];
+		sprintf(ostr, "ansicon -E [46mProcess:[0m ");
+		system(ostr);
+		printf("Find %d Seeds (Cycle): %d\n", i + sampleFace.sample_curves.size(), seeds[i + sampleFace.sample_curves.size()].size());
 		draw_curves(false);
 		sample_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
 		draw_sample_face(i, color_chips(i + sampleFace.sample_curves.size()), false);
@@ -187,17 +199,13 @@ unsigned int mangaShow::get_max_count_seed(std::vector<std::unordered_map<unsign
 }
 
 void mangaShow::relative_seed(){
+	// init
 	unsigned int n = sampleFace.sample_curves.size() + sampleFace.sample_cycles.size();
-
-	std::vector<std::vector<mgd>> all_gd;
-	std::vector<std::vector<unsigned int>> gd_idx;
 	gd_idx.resize(n);
 	for (unsigned int i = 0; i < n; ++i) gd_idx[i].resize(n);
+	geo_score.resize(n);
 
 	clock_t start_t, end_t;
-
-	std::vector<std::unordered_map<unsigned int, double>> geo_score;
-	geo_score.resize(n);
 	for (unsigned int t1 = 0; t1 < n; ++t1){
 		for (unsigned int t2 = t1 + 1; t2 < n; ++t2){
 			std::vector<double> a_r_a = calculate_relative(sampleFace_CD[t1], sampleFace_CD[t2], is_cur[t1], is_cur[t2]);
@@ -221,7 +229,10 @@ void mangaShow::relative_seed(){
 				}
 			}
 			end_t = clock();
-			printf("==> relative %d <-> %d take %lf\n", t1, t2, (end_t - start_t) / (double)CLOCKS_PER_SEC);
+			char ostr[100];
+			sprintf(ostr, "ansicon -E [46mProcess:[0m ");
+			system(ostr);
+			printf("Relative %d <-> %d take %lf\n", t1, t2, (end_t - start_t) / (double)CLOCKS_PER_SEC);
 
 			std::vector<double> n_M, n_m;
 			n_M.resize(a_r_a.size()), n_m.resize(a_r_a.size());
@@ -270,7 +281,49 @@ void mangaShow::relative_seed(){
 			all_gd.push_back(gd_vec);
 		}
 	}
+	
+	return;
+}
 
+void mangaShow::llink_seed(){
+	unsigned int n = sampleFace.sample_curves.size() + sampleFace.sample_cycles.size();
+	
+
+	typedef struct lt{
+		std::vector<unsigned int> seeds;
+		unsigned int total_rank;
+		lt(unsigned int n){ seeds.resize(n); total_rank = 0; }
+	} lt;
+	struct lt_cmp{ bool operator()(lt const &a, lt const &b){ return a.total_rank < b.total_rank; }; };
+
+	std::vector<std::unordered_map<unsigned int, std::unordered_set<unsigned int>>> link_table;
+	std::vector<unsigned int> link_rank;
+	std::vector<bool> perfect_link, half_link, poor_link;
+	link_table.resize(n);
+	link_rank.resize(n * (n - 1) / 2); // assert {0}
+	perfect_link.resize(link_rank.size()), half_link.resize(link_rank.size()), poor_link.resize(link_rank.size());
+
+	for (unsigned int i = 0; i < n; ++i){
+		for (unsigned int j = i + 1; j < n; ++j){
+			mgd gd = all_gd[gd_idx[i][j]][link_rank[gd_idx[i][j]]];
+
+			link_table[i][gd.i].insert(gd_idx[i][j]);
+			link_table[j][gd.j].insert(gd_idx[i][j]);
+		}
+	}
+
+	for (unsigned int i = 0; i < n; ++i){
+		char ostr[100];
+		sprintf(ostr, "ansicon -e [41mDebug:[0m ");
+		system(ostr);
+		for (auto l : link_table[i]){
+			printf("%u: %u\n", l.first, l.second.size());
+		}
+	}
+}
+
+void mangaShow::link_seed(){
+	unsigned int n = sampleFace.sample_curves.size() + sampleFace.sample_cycles.size();
 
 	typedef struct gs{
 		unsigned int idx;
@@ -300,7 +353,7 @@ void mangaShow::relative_seed(){
 	std::vector<unsigned int>::iterator max_prim, min_prim;
 	unsigned int prev_prim = 0, prim_idx = 0, it_count = 0;
 	unsigned int max_prim_score = 0, this_prim_max_score = 0;
-	for (unsigned int i = 0; i < 30; ++ i){
+	for (unsigned int i = 0; i < 30; ++i){
 		relative_table = build_relative_table(all_gd, gd_idx, now_seed, i);
 		seed_use_count = calculate_seed_use_count(relative_table);
 		prim_score = calculate_prim_score(relative_table, seed_use_count);
@@ -319,7 +372,7 @@ void mangaShow::relative_seed(){
 				break;
 			}
 		}
-		
+
 		if (prev_prim != min_prim - prim_score.begin()){
 			prim_idx = 0;
 			this_prim_max_score = now_score;
@@ -330,7 +383,7 @@ void mangaShow::relative_seed(){
 				max_prim_seed = optimal_seed;
 			}
 		}
-	
+
 		if (prim_idx >= prim_gs[min_prim - prim_score.begin()].size()){
 			printf("%u / %u\n", prim_idx, prim_gs[min_prim - prim_score.begin()].size());
 			//optimal_seed = max_prim_seed;
@@ -356,8 +409,6 @@ void mangaShow::relative_seed(){
 		}
 	}
 	printf("=> relative diff = %lf\n", relative_diff);
-	
-	return;
 }
 
 void mangaShow::draw_matching(){
@@ -442,7 +493,9 @@ void mangaShow::draw_graph(){
 	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
 	cv::imwrite("results/topology.png", canvas);
 
-	printf("=> Drawing graph done.\n");
+	char ostr[100];
+	sprintf(ostr, "ansicon -e [42mLog:[0m Drawing graph done.");
+	system(ostr);
 	return;
 }
 
@@ -496,7 +549,9 @@ void mangaShow::draw_curves(bool is_colorful){
 	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
 	cv::imwrite("results/curves.png", canvas);
 
-	printf("=> Drawing curves done.\n");
+	char ostr[100];
+	sprintf(ostr, "ansicon -e [42mLog:[0m Drawing curves done.");
+	system(ostr);
 	return;
 }
 
@@ -816,7 +871,7 @@ void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_cu
 			}
 		}
 	}
-	printf("==> 3, ");
+	printf("3, ");
 
 	for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
 		if (curve_is_visited[i] || mangaFace.sample_curves[i].size() == 0) continue;
