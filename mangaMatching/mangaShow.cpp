@@ -4,10 +4,10 @@ bool point2d_vector_size_cmp(const std::vector<cv::Point2d> &a, const std::vecto
 bool p_x_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.x < b.x; }
 bool p_y_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.y < b.y; }
 
-int is_cur[12] = { 1, 1, 1, 2, 2, 3, 3, 1, 1, 1, 1, 1 };
+int is_cur[12] = { 1, 1, 1, 1, 2, 3, 3, 1, 1, 1, 1, 1 };
 double graph_sample = 0.005;
 double sample_sample = 0.005;
-double max_r_thresh = 0.4;
+double max_r_thresh = 0.5;
 double scale_max = 1.4;
 double scale_inter = 0.4;
 
@@ -17,6 +17,7 @@ mangaShow::mangaShow(){
 	curves_drawable.clear();
 	mangaFace_CD.clear();
 	sampleFace_CD.clear();
+	notable.clear();
 }
 
 void mangaShow::read_img(char *filename){
@@ -59,6 +60,49 @@ void mangaShow::read_graph(char *filename, int g_s){
 			prim_is_open.push_back(false);
 		}
 	}
+	return;
+}
+
+void mangaShow::read_notable(char *filename){
+	FILE *notable_file = fopen(filename, "r");
+
+	std::vector<cv::Point2f> a, b, c;
+
+	unsigned int n;
+	fscanf(notable_file, "%u\n", &n);
+
+	a.resize(n), b.resize(n), c.resize(n);
+	notable.resize(n);
+	for (unsigned int i = 0; i < n; ++i){
+		fscanf(notable_file, "%f %f\n", &a[i].x, &a[i].y);
+		notable[i] = a[i];
+	}
+	for (unsigned int i = 0; i < n; ++i)
+		fscanf(notable_file, "%f %f\n", &b[i].x, &b[i].y);
+
+	printf("----- warp:\n");
+	cv::Mat R = cv::estimateRigidTransform(a, b, true);
+	std::cout << R << std::endl;
+	cv::Mat H = cv::Mat(3, 3, R.type());
+	H.at<double>(0, 0) = R.at<double>(0, 0);
+	H.at<double>(0, 1) = R.at<double>(0, 1);
+	H.at<double>(0, 2) = R.at<double>(0, 2);
+
+	H.at<double>(1, 0) = R.at<double>(1, 0);
+	H.at<double>(1, 1) = R.at<double>(1, 1);
+	H.at<double>(1, 2) = R.at<double>(1, 2);
+
+	H.at<double>(2, 0) = 0.0;
+	H.at<double>(2, 1) = 0.0;
+	H.at<double>(2, 2) = 1.0;
+
+	cv::perspectiveTransform(a, c, H);
+	double diff = 0;
+	for (unsigned int i = 0; i < c.size(); ++i){
+		printf("%lf, %lf\n", c[i].x, c[i].y);
+		diff += abs(c[i].x - b[i].x) + abs(c[i].y - b[i].y);
+	}
+	printf("diff = %lf\n", diff);
 	return;
 }
 
@@ -204,6 +248,7 @@ void mangaShow::relative_seed(){
 	gd_idx.resize(n);
 	for (unsigned int i = 0; i < n; ++i) gd_idx[i].resize(n);
 	geo_score.resize(n);
+	all_gd.clear();
 
 	clock_t start_t, end_t;
 	for (unsigned int t1 = 0; t1 < n; ++t1){
@@ -287,40 +332,72 @@ void mangaShow::relative_seed(){
 
 void mangaShow::llink_seed(){
 	unsigned int n = sampleFace.sample_curves.size() + sampleFace.sample_cycles.size();
-	
 
-	typedef struct lt{
-		std::vector<unsigned int> seeds;
-		unsigned int total_rank;
-		lt(unsigned int n){ seeds.resize(n); total_rank = 0; }
-	} lt;
-	struct lt_cmp{ bool operator()(lt const &a, lt const &b){ return a.total_rank < b.total_rank; }; };
+	char ostr[100];
+	for (unsigned int rk = 0; rk < 30; ++rk){
+		for (unsigned int i = 0; i < n; ++i){
+			for (unsigned int j = i + 1; j < n; ++j){
+				if (rk >= all_gd[gd_idx[i][j]].size()) continue;
+				
+				mlt lt(n);
+				lt.seeds[i] = all_gd[gd_idx[i][j]][rk].i;
+				lt.seeds[j] = all_gd[gd_idx[i][j]][rk].j;
+				lt.total_rank += rk;
 
-	std::vector<std::unordered_map<unsigned int, std::unordered_set<unsigned int>>> link_table;
-	std::vector<unsigned int> link_rank;
-	std::vector<bool> perfect_link, half_link, poor_link;
-	link_table.resize(n);
-	link_rank.resize(n * (n - 1) / 2); // assert {0}
-	perfect_link.resize(link_rank.size()), half_link.resize(link_rank.size()), poor_link.resize(link_rank.size());
-
-	for (unsigned int i = 0; i < n; ++i){
-		for (unsigned int j = i + 1; j < n; ++j){
-			mgd gd = all_gd[gd_idx[i][j]][link_rank[gd_idx[i][j]]];
-
-			link_table[i][gd.i].insert(gd_idx[i][j]);
-			link_table[j][gd.j].insert(gd_idx[i][j]);
+				for (unsigned int k = 0; k < n; ++k){
+					if (k == i || k == j) continue;
+					unsigned int min_k = 0, min_rk = std::numeric_limits<unsigned int>::max();
+					for (unsigned int l = 0; l < seeds[k].size(); ++l){
+						unsigned int a_rk, b_rk;
+						for (a_rk = 0; a_rk < all_gd[gd_idx[i][k]].size(); ++a_rk){
+							mgd &gd = all_gd[gd_idx[i][k]][a_rk];
+							if (i < k && lt.seeds[i] == gd.i && l == gd.j ||
+								i > k && lt.seeds[i] == gd.j && l == gd.i) break;
+						}
+						for (b_rk = 0; b_rk < all_gd[gd_idx[j][k]].size(); ++b_rk){
+							mgd &gd = all_gd[gd_idx[j][k]][b_rk];
+							if (j < k && lt.seeds[j] == gd.i && l == gd.j ||
+								j > k && lt.seeds[j] == gd.j && l == gd.i) break;
+						}
+						if (a_rk == all_gd[gd_idx[i][k]].size() || b_rk == all_gd[gd_idx[j][k]].size()){
+							sprintf(ostr, "ansicon -e [41mDebug:[0m Can't find joint!!");
+							system(ostr);
+						}
+						if (a_rk + b_rk < min_rk){
+							min_rk = a_rk + b_rk;
+							min_k = l;
+						}
+					}
+					lt.seeds[k] = min_k;
+					lt.total_rank += min_rk;
+				}
+				for (unsigned int k = 0; k < n; ++k){
+					if (k == i || k == j) continue;
+					for (unsigned int l = k + 1; l < n; ++l){
+						if (l == i || l == j) continue;
+						unsigned a_rk;
+						for (a_rk = 0; a_rk < all_gd[gd_idx[k][l]].size(); ++a_rk){
+							mgd &gd = all_gd[gd_idx[k][l]][a_rk];
+							if (lt.seeds[k] == gd.i && lt.seeds[l] == gd.j) break;
+						}
+						if (a_rk == all_gd[gd_idx[k][l]].size()){
+							char ostr[100];
+							sprintf(ostr, "ansicon -e [41mDebug:[0m Can't find relative!!");
+							system(ostr);
+						}
+						lt.total_rank += a_rk;
+					}
+				}
+				if (std::find(links.begin(), links.end(), lt) == links.end())
+					links.push_back(lt);
+			}
 		}
 	}
+	std::sort(links.begin(), links.end(), mlt_cmp());
 
-	for (unsigned int i = 0; i < n; ++i){
-		char ostr[100];
-		sprintf(ostr, "ansicon -e [41mDebug:[0m ");
-		system(ostr);
-		for (auto l : link_table[i]){
-			printf("%u: %u\n", l.first, l.second.size());
-		}
-	}
+	return;
 }
+
 
 void mangaShow::link_seed(){
 	unsigned int n = sampleFace.sample_curves.size() + sampleFace.sample_cycles.size();
@@ -411,12 +488,83 @@ void mangaShow::link_seed(){
 	printf("=> relative diff = %lf\n", relative_diff);
 }
 
+void mangaShow::ddraw_matching(){
+	unsigned int n = sampleFace.sample_curves.size() + sampleFace.sample_cycles.size();
+	int ps = std::max(img_read.rows, img_read.cols);
+	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
+
+	char str[100];
+	for (unsigned int rk = 0; rk < 10 && rk < links.size(); ++rk){
+		sprintf(str, "results/notable_%u.txt", rk);
+		FILE *out_notable = fopen(str, "w");
+		fprintf(out_notable, "%d\n", n);
+
+		draw_curves(false);
+		for (unsigned int i = 0; i < n; ++i){
+			CurveDescriptor s_d = CurveDescriptor(seeds[i][links[rk].seeds[i]], graph_sample, 3.0);
+			for (unsigned int j = 1; j < s_d.curve.size(); ++j){
+				cv::line(img_show,
+					cv::Point2d(s_d.curve[j - 1].x * ps, s_d.curve[j - 1].y * -ps) + ds,
+					cv::Point2d(s_d.curve[j].x * ps, s_d.curve[j].y * -ps) + ds,
+					color_chips(i));
+			}
+			cv::Point2d npt = get_notable_pnt(s_d, is_cur[i]);
+			cv::circle(img_show, cv::Point2d(npt.x * ps, npt.y * -ps) + ds, 2, black, CV_FILLED);
+			fprintf(out_notable, "%lf %lf\n", npt.x, npt.y);
+		}
+		cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
+		sprintf(str, "results/canvas_%u.png", rk);
+		cv::imwrite(str, canvas);
+
+		for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
+			cv::Point2d npt = get_notable_pnt(sampleFace.sample_curves[i], is_cur[i]);
+			fprintf(out_notable, "%lf %lf\n", npt.x, npt.y);
+		}
+		for (unsigned int i = 0; i < sampleFace.sample_cycles.size(); ++i){
+			cv::Point2d npt = get_midpoint(sampleFace.sample_cycles[i]);
+			fprintf(out_notable, "%lf %lf\n", npt.x, npt.y);
+		}
+		fprintf(out_notable, "total rank: %u\n", links[rk].total_rank);
+
+		fclose(out_notable);
+	}
+
+	sample_show = cv::Mat(img_read.rows, img_read.cols, CV_8UC3, cv::Scalar(255, 255, 255));
+	for (unsigned int i = 0; i < sampleFace.sample_curves.size(); ++i){
+		for (unsigned int j = 1; j < sampleFace.sample_curves[i].size(); ++j){
+			cv::line(sample_show,
+				cv::Point2d(sampleFace.sample_curves[i][j - 1].x * ps, sampleFace.sample_curves[i][j - 1].y * -ps) + ds,
+				cv::Point2d(sampleFace.sample_curves[i][j].x * ps, sampleFace.sample_curves[i][j].y * -ps) + ds,
+				color_chips(i));
+		}
+		cv::Point2d npt = get_notable_pnt(sampleFace.sample_curves[i], is_cur[i]);
+		cv::circle(sample_show, cv::Point2d(npt.x * ps, npt.y * -ps) + ds, 2, black, CV_FILLED);
+	}
+	for (unsigned int i = 0; i < sampleFace.sample_cycles.size(); ++i){
+		for (unsigned int j = 0; j < sampleFace.sample_cycles[i].size(); ++j){
+			cv::Point2d p1 = j ? sampleFace.sample_cycles[i][j - 1] : sampleFace.sample_cycles[i].back();
+			cv::Point2d p2 = sampleFace.sample_cycles[i][j];
+			cv::line(sample_show,
+				cv::Point2d(p1.x * ps, p1.y * -ps) + ds, cv::Point2d(p2.x * ps, p2.y * -ps) + ds,
+				color_chips(i + sampleFace.sample_curves.size()));
+		}
+		cv::Point2d npt = get_midpoint(sampleFace.sample_cycles[i]);
+		cv::circle(sample_show, cv::Point2d(npt.x * ps, npt.y * -ps) + ds, 2, black, CV_FILLED);
+	}
+	cv::resize(sample_show, sample_canvas, cv::Size(sample_show.cols * scale, sample_show.rows * scale));
+	cv::imwrite("results/sample_canvas.png", sample_canvas);
+
+	return;
+}
+
 void mangaShow::draw_matching(){
 	int ps = std::max(img_read.rows, img_read.cols);
 	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
 
 	FILE *out_notable = fopen("results/notable.txt", "w");
 	fprintf(out_notable, "%d\n", sampleFace.sample_curves.size() + sampleFace.sample_cycles.size());
+
+	//FILE *out_curve = fopen("results/curve.txt", "w");
 
 	draw_curves(false);
 	for (unsigned int i = 0; i < sampleFace.sample_curves.size() + sampleFace.sample_cycles.size(); ++i){
@@ -555,6 +703,39 @@ void mangaShow::draw_curves(bool is_colorful){
 	return;
 }
 
+void mangaShow::draw_notable(){
+	int ps = std::max(img_read.rows, img_read.cols);
+	cv::Point2d ds(img_read.cols >> 1, img_read.rows >> 1);
+
+	draw_curves(false);
+	for (unsigned int i = 0; i < notable.size(); ++i){
+		cv::circle(img_show, cv::Point2d(notable[i].x * ps, notable[i].y * -ps) + ds, 2, color_chips(i), CV_FILLED);
+	}
+	cv::line(img_show,
+		cv::Point2d(notable[5].x * ps, notable[5].y * -ps) + ds,
+		cv::Point2d(notable[6].x * ps, notable[6].y * -ps) + ds,
+		red, 1);
+
+	cv::Point2d ref_pnt = get_reflect_point(notable[0], notable[5], notable[6]);
+	cv::circle(img_show, cv::Point2d(ref_pnt.x * ps, ref_pnt.y * -ps) + ds, 2, color_chips(7), CV_FILLED);
+
+	cv::Point2d prev_pnt;
+	for (double t = 0.0; t <= 1.0; t += 0.1){
+		cv::Point2d curr_pnt = (1 - t) * (1 - t) * notable[0] + 2 * t * (1 - t) * notable[3] + t * t * ref_pnt;
+		if (t > 0.0)
+			cv::line(img_show,
+				cv::Point2d(prev_pnt.x * ps, prev_pnt.y * -ps) + ds,
+				cv::Point2d(curr_pnt.x * ps, curr_pnt.y * -ps) + ds,
+				red, 1);
+		prev_pnt = curr_pnt;
+	}
+
+	cv::resize(img_show, canvas, cv::Size(img_show.cols * scale, img_show.rows * scale));
+	cv::imwrite("results/canvas.png", canvas);
+
+	return;
+}
+
 bool mangaShow::is_read_img(){
 	return img_read.dims ? true : false;
 }
@@ -565,6 +746,10 @@ bool mangaShow::is_read_mangaFace(){
 
 bool mangaShow::is_read_sampleFace(){
 	return sampleFace.graph.size() ? true : false;
+}
+
+bool mangaShow::is_read_notable(){
+	return notable.size() ? true : false;
 }
 
 Bitmap ^mangaShow::mat2Bitmap(cv::Mat img){
@@ -601,44 +786,7 @@ std::vector<bool> mangaShow::get_curves_drawable(){
 	return curves_drawable;
 }
 
-void mangaShow::test(char *filename){
-	FILE *notable_file = fopen(filename, "r");
-
-	std::vector<cv::Point2f> a, b, c;
-	
-	unsigned int n;
-	fscanf(notable_file, "%u\n", &n);
-
-	a.resize(n), b.resize(n), c.resize(n);
-	for (unsigned int i = 0; i < n; ++i)
-		fscanf(notable_file, "%f %f\n", &a[i].x, &a[i].y);
-	for (unsigned int i = 0; i < n; ++i)
-		fscanf(notable_file, "%f %f\n", &b[i].x, &b[i].y);
-
-	printf("----- warp:\n");
-	cv::Mat R = cv::estimateRigidTransform(a, b, true);
-	std::cout << R << std::endl;
-	cv::Mat H = cv::Mat(3, 3, R.type());
-	H.at<double>(0, 0) = R.at<double>(0, 0);
-	H.at<double>(0, 1) = R.at<double>(0, 1);
-	H.at<double>(0, 2) = R.at<double>(0, 2);
-
-	H.at<double>(1, 0) = R.at<double>(1, 0);
-	H.at<double>(1, 1) = R.at<double>(1, 1);
-	H.at<double>(1, 2) = R.at<double>(1, 2);
-
-	H.at<double>(2, 0) = 0.0;
-	H.at<double>(2, 1) = 0.0;
-	H.at<double>(2, 2) = 1.0;
-
-	cv::perspectiveTransform(a, c, H);
-	double diff = 0;
-	for (unsigned int i = 0; i < c.size(); ++i){
-		printf("%lf, %lf\n", c[i].x, c[i].y);
-		diff += abs(c[i].x - b[i].x) + abs(c[i].y - b[i].y);
-	}
-	printf("diff = %lf\n", diff);
-	return;
+void mangaShow::test(){
 }
 
 cv::Scalar mangaShow::color_chips(int i){
@@ -1023,6 +1171,16 @@ cv::Point2d mangaShow::get_midpoint(std::vector<cv::Point2d> pnts){
 	if (pnts.size() == 0) return m;
 	for (unsigned int i = 0; i < pnts.size(); ++i) m += pnts[i];
 	return cv::Point2d(m.x / pnts.size(), m.y / pnts.size());
+}
+
+// mx + y = c
+cv::Point2d mangaShow::get_reflect_point(cv::Point2d a, cv::Point2d p, cv::Point2d q){
+	cv::Point2d n = q - p;
+	double m = -n.y / n.x;
+	double c = m * p.x + p.y;
+	double t = (a.x * n.x + (a.y - c) * n.y) / (n.x - m * n.y);
+	cv::Point2d b(t, c - m * t);
+	return a + (b - a) * 2;
 }
 
 // p to p1<->p2 line distance

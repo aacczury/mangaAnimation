@@ -193,9 +193,10 @@ namespace mangaMatching {
 							 }
 							 else if (txtExt->IndexOf(ext) >= 0){
 								 char *fileName = (char*)System::Runtime::InteropServices::Marshal::StringToHGlobalAnsi(files[i]).ToPointer();
-								 ms.test(fileName);
+								 ms.read_notable(fileName);
 							 }
 						 }
+
 
 						 if (ms.is_read_img() && ms.is_read_sampleFace()){
 							 ms.draw_sample_face();
@@ -220,15 +221,19 @@ namespace mangaMatching {
 								 system(ostr);
 
 								 QueryPerformanceCounter(&start_t);
-								 ms.llink_seed();
-								 //ms.link_seed();
+								 ms.link_seed();
 								 QueryPerformanceCounter(&end_t);
 								 sprintf(ostr, "ansicon -e [30;43mTime:[0m [1;32mLink Seed[0m cost %lfs.", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
 								 system(ostr);
 
-								 //ms.draw_matching();
+								 ms.draw_matching();
 								 //this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
 							 }
+
+							 if (ms.is_read_notable()){
+								 ms.draw_notable();
+							 }
+
 							 this->showLine_pictureBox->Image = ms.get_canvas_Bitmap();
 
 							 this->lineCheck_groupBox->Controls->Clear();

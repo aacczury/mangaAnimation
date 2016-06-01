@@ -40,29 +40,33 @@ public:
 	mangaShow();
 	void read_img(char *);
 	void read_graph(char *, int g_s = MANGA_FACE);
+	void read_notable(char *);
 
 	void find_seed();
 	void relative_seed();
 	void link_seed();
 	void llink_seed();
 	void draw_matching();
+	void ddraw_matching();
 
 	void draw_graph();
 	void draw_sample_face(int sample = -1, cv::Scalar color = cv::Scalar(125, 125, 125), bool is_open = true);
 	void rng_curves_color();
 	void set_curves_drawable(int index = -1, bool is_draw = true);
 	void draw_curves(bool is_colorful = true);
+	void draw_notable();
 
 	bool is_read_img();
 	bool is_read_mangaFace();
 	bool is_read_sampleFace();
+	bool is_read_notable();
 
 	Bitmap ^mat2Bitmap(cv::Mat);
 	Bitmap ^get_canvas_Bitmap();
 	Bitmap ^get_sample_canvas_Bitmap();
 	std::vector<bool> get_curves_drawable();
 
-	void test(char *);
+	void test();
 
 private:
 
@@ -73,6 +77,14 @@ private:
 		mgd(){ diff = 0, i = 0, j = 0; gd.clear(); }
 	} mgd;
 	struct mgd_cmp{ bool operator()(mgd const &a, mgd const &b){ return a.diff < b.diff; }; };
+
+	typedef struct mlt{
+		std::vector<unsigned int> seeds;
+		unsigned int total_rank;
+		mlt(unsigned int n){ seeds.resize(n); total_rank = 0; }
+		bool operator==(mlt const &lt){ return seeds == lt.seeds; };
+	} mlt;
+	struct mlt_cmp{ bool operator()(mlt const &a, mlt const &b){ return a.total_rank < b.total_rank; }; };
 
 	int scale = 3;
 	cv::RNG rng = cv::RNG(1234);
@@ -90,6 +102,9 @@ private:
 	std::vector<std::vector<unsigned int>> gd_idx;
 	std::vector<std::unordered_map<unsigned int, double>> geo_score;
 	std::vector<unsigned int> optimal_seed;
+	std::vector<mlt> links;
+
+	std::vector<cv::Point2d> notable;
 
 	cv::Scalar red = cv::Scalar(0, 0, 255);
 	cv::Scalar yellow = cv::Scalar(0, 255, 255);
@@ -127,6 +142,7 @@ private:
 	std::vector<cv::Point2d> join_curve(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b);
 	cv::Point2d get_midpoint(cv::Point2d a, cv::Point2d b);
 	cv::Point2d get_midpoint(std::vector<cv::Point2d> pnts);
+	cv::Point2d get_reflect_point(cv::Point2d a, cv::Point2d p, cv::Point2d q);
 	double perpendicular_distance(cv::Point2d p, cv::Point2d p1, cv::Point2d p2);
 
 	std::vector<unsigned int> douglas_peucker(std::vector<cv::Point2d> &line, int max_depth, int p = 0, int q = -1, int depth = 0);
