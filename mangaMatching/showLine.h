@@ -221,12 +221,12 @@ namespace mangaMatching {
 								 system(ostr);
 
 								 QueryPerformanceCounter(&start_t);
-								 ms.link_seed();
+								 ms.llink_seed();
 								 QueryPerformanceCounter(&end_t);
 								 sprintf(ostr, "ansicon -e [30;43mTime:[0m [1;32mLink Seed[0m cost %lfs.", ((double)end_t.QuadPart - (double)start_t.QuadPart) / freq.QuadPart);
 								 system(ostr);
 
-								 ms.draw_matching();
+								 ms.ddraw_matching();
 								 //this->sampleFace_pictureBox->Image = ms.get_sample_canvas_Bitmap();
 							 }
 

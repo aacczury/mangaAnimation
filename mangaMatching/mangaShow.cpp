@@ -4,7 +4,7 @@ bool point2d_vector_size_cmp(const std::vector<cv::Point2d> &a, const std::vecto
 bool p_x_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.x < b.x; }
 bool p_y_cmp(cv::Point2d const &a, cv::Point2d const &b){ return a.y < b.y; }
 
-int is_cur[12] = { 1, 1, 1, 1, 2, 3, 3, 1, 1, 1, 1, 1 };
+int is_cur[12] = { 0, 1, 1, 0, 2, 3, 3, 1, 1, 1, 1, 1 };
 double graph_sample = 0.005;
 double sample_sample = 0.005;
 double max_r_thresh = 0.5;
@@ -343,10 +343,12 @@ void mangaShow::llink_seed(){
 				lt.seeds[i] = all_gd[gd_idx[i][j]][rk].i;
 				lt.seeds[j] = all_gd[gd_idx[i][j]][rk].j;
 				lt.total_rank += rk;
+				lt.total_diff += all_gd[gd_idx[i][j]][rk].diff;
 
 				for (unsigned int k = 0; k < n; ++k){
 					if (k == i || k == j) continue;
 					unsigned int min_k = 0, min_rk = std::numeric_limits<unsigned int>::max();
+					double min_diff;
 					for (unsigned int l = 0; l < seeds[k].size(); ++l){
 						unsigned int a_rk, b_rk;
 						for (a_rk = 0; a_rk < all_gd[gd_idx[i][k]].size(); ++a_rk){
@@ -366,10 +368,12 @@ void mangaShow::llink_seed(){
 						if (a_rk + b_rk < min_rk){
 							min_rk = a_rk + b_rk;
 							min_k = l;
+							min_diff = all_gd[gd_idx[i][k]][a_rk].diff + all_gd[gd_idx[j][k]][b_rk].diff;
 						}
 					}
 					lt.seeds[k] = min_k;
 					lt.total_rank += min_rk;
+					lt.total_diff += min_diff;
 				}
 				for (unsigned int k = 0; k < n; ++k){
 					if (k == i || k == j) continue;
@@ -500,6 +504,7 @@ void mangaShow::ddraw_matching(){
 		fprintf(out_notable, "%d\n", n);
 
 		draw_curves(false);
+		cv::Point2d chin_notable;
 		for (unsigned int i = 0; i < n; ++i){
 			CurveDescriptor s_d = CurveDescriptor(seeds[i][links[rk].seeds[i]], graph_sample, 3.0);
 			for (unsigned int j = 1; j < s_d.curve.size(); ++j){
@@ -509,6 +514,17 @@ void mangaShow::ddraw_matching(){
 					color_chips(i));
 			}
 			cv::Point2d npt = get_notable_pnt(s_d, is_cur[i]);
+			//if (i == 0) chin_notable = npt;
+			//if (i == 4 && is_cur[i] == 2){
+			//	double min_d = std::numeric_limits<double>::max();
+			//	CurveDescriptor s_d = CurveDescriptor(seed_curves[i][links[rk].seeds[i]], graph_sample, 3.0);
+			//	for (unsigned int j = 0; j < s_d.curve.size(); ++j){
+			//		if (cv::norm(chin_notable - s_d.curve[j]) < min_d){
+			//			min_d = cv::norm(chin_notable - s_d.curve[j]);
+			//			npt = s_d.curve[j];
+			//		}
+			//	}
+			//}
 			cv::circle(img_show, cv::Point2d(npt.x * ps, npt.y * -ps) + ds, 2, black, CV_FILLED);
 			fprintf(out_notable, "%lf %lf\n", npt.x, npt.y);
 		}
@@ -716,7 +732,8 @@ void mangaShow::draw_notable(){
 		cv::Point2d(notable[6].x * ps, notable[6].y * -ps) + ds,
 		red, 1);
 
-	cv::Point2d ref_pnt = get_reflect_point(notable[0], notable[5], notable[6]);
+	//cv::Point2d ref_pnt = get_reflect_point(notable[0], notable[5], notable[6]);
+	cv::Point2d ref_pnt = notable[0] + (get_midpoint(notable[5], notable[6]) - notable[0]) * 2;
 	cv::circle(img_show, cv::Point2d(ref_pnt.x * ps, ref_pnt.y * -ps) + ds, 2, color_chips(7), CV_FILLED);
 
 	cv::Point2d prev_pnt;
@@ -874,7 +891,7 @@ std::vector<cv::Point2d> mangaShow::compare_curve(std::vector<cv::Point2d> a, st
 			segment.push_back(b_d.curve[j + offset / i]);
 
 		double b_length = curve_length(segment);
-		double b_distance = cv::norm(segment[0] - segment[segment.size() - 1]);
+		double b_distance = cv::norm(segment.front() - segment.back());
 		double b_ratio = b_length / b_distance;
 		if ((a_ratio - a_ratio * 0.4 > b_ratio) ||
 			(a_ratio + a_ratio * 0.5 < b_ratio)) continue;
@@ -896,11 +913,17 @@ void mangaShow::compare_curve_add_seed(std::vector<cv::Point2d> a, std::vector<c
 
 	std::reverse(a.begin(), a.end());
 	seed = compare_curve(a, b, is_c);
-	if (seed.size() > 0) seeds[p_i].push_back(seed);
+	if (seed.size() > 0){
+		seeds[p_i].push_back(seed);
+		seed_curves[p_i].push_back(b);
+	}
 
 	std::reverse(a.begin(), a.end());
 	seed = compare_curve(a, b, is_c);
-	if (seed.size() > 0) seeds[p_i].push_back(seed);
+	if (seed.size() > 0){
+		seeds[p_i].push_back(seed);
+		seed_curves[p_i].push_back(b);
+	}
 
 	return;
 }
@@ -909,7 +932,7 @@ void mangaShow::remove_duplication_seed(unsigned int p_i){
 	std::sort(seeds[p_i].begin(), seeds[p_i].end(), point2d_vector_size_cmp);
 	std::vector<bool> is_dup;
 	is_dup.resize(seeds[p_i].size());
-	std::vector<std::vector<cv::Point2d>> tmp_seed;
+	std::vector<std::vector<cv::Point2d>> tmp_seed, tmp_seed_curve;
 
 	for (unsigned int i = 0; i < seeds[p_i].size(); ++i){
 		for (unsigned int j = i + 1; j < seeds[p_i].size(); ++j){
@@ -922,10 +945,13 @@ void mangaShow::remove_duplication_seed(unsigned int p_i){
 		}
 	}
 
-	tmp_seed = seeds[p_i];
-	seeds[p_i].clear();
+	tmp_seed = seeds[p_i], tmp_seed_curve = seed_curves[p_i];
+	seeds[p_i].clear(), seed_curves.clear();
 	for (unsigned int i = 0; i < tmp_seed.size(); ++i){
-		if (!is_dup[i]) seeds[p_i].push_back(tmp_seed[i]);
+		if (!is_dup[i]){
+			seeds[p_i].push_back(tmp_seed[i]);
+			seed_curves[p_i].push_back(tmp_seed_curve[i]);
+		}
 	}
 	return;
 }
@@ -963,6 +989,8 @@ cv::Point have_dup_frag(std::vector<cv::Point2d> a, std::vector<cv::Point2d> b){
 
 void mangaShow::simplify_seed(unsigned int p_i){
 	std::vector<std::vector<cv::Point2d>> tmp_seed, idn_seed;
+	std::vector<bool> is_simplify;
+	is_simplify.resize(seeds[p_i].size());
 	tmp_seed = seeds[p_i], idn_seed.clear();
 	
 	for (unsigned int i = 0; i < tmp_seed.size(); ++i){
@@ -991,29 +1019,102 @@ std::vector<cv::Point2d> mangaShow::join_curve(std::vector<cv::Point2d> a, std::
 
 // need link curve function
 void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_curve, unsigned int p_i, int is_c){
+	//if (seeds.size() != sampleFace.sample_curves.size() + sampleFace.sample_cycles.size())
+	//	seeds.resize(sampleFace.sample_curves.size() + sampleFace.sample_cycles.size());
+	//std::vector<bool> curve_is_visited;
+	//curve_is_visited.resize(mangaFace.sample_curves.size()); // all will be zero
+	//
+	//
+	//for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
+	//	if (mangaFace.sample_curves[i].size() == 0){
+	//		printf("Warning: manga face curve 0 size\n");
+	//		continue;
+	//	}
+	//
+	//	for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]].size(); ++j){
+	//		unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]][j];
+	//		if (a_crv == i || mangaFace.sample_curves[a_crv].size() == 0) continue;
+	//
+	//		std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[a_crv], mangaFace.sample_curves[i]);
+	//
+	//		for (unsigned int k = 0; k < mangaFace.pnt_to_curve[mangaFace.sample_curves[i].back()].size(); ++k){
+	//			unsigned int b_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i].back()][k];
+	//			if (b_crv == i || mangaFace.sample_curves[b_crv].size() == 0) continue;
+	//
+	//			std::vector<cv::Point2d> curve_e = join_curve(curve, mangaFace.sample_curves[b_crv]);
+	//			compare_curve_add_seed(sample_curve, curve_e, p_i, is_c);
+	//			curve_is_visited[a_crv] = curve_is_visited[i] = curve_is_visited[b_crv] = true;
+	//		}
+	//	}
+	//}
+	//printf("3, ");
+	//
+	//for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
+	//	if (curve_is_visited[i] || mangaFace.sample_curves[i].size() == 0) continue;
+	//
+	//	for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]].size(); ++j){
+	//		unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]][j];
+	//		if (a_crv <= i || curve_is_visited[a_crv] || mangaFace.sample_curves[a_crv].size() == 0) continue;
+	//
+	//		std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[a_crv], mangaFace.sample_curves[i]);
+	//		compare_curve_add_seed(sample_curve, curve, p_i, is_c);
+	//		curve_is_visited[a_crv] = curve_is_visited[i] = true;
+	//	}
+	//
+	//	for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]].size(); ++j){
+	//		unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]][j];
+	//		if (a_crv <= i || curve_is_visited[a_crv] || mangaFace.sample_curves[a_crv].size() == 0) continue;
+	//
+	//		std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[i], mangaFace.sample_curves[a_crv]);
+	//		compare_curve_add_seed(sample_curve, curve, p_i, is_c);
+	//		curve_is_visited[a_crv] = curve_is_visited[i] = true;
+	//	}
+	//}
+	//printf("2, ");
+	//
+	//for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
+	//	if (curve_is_visited[i] || mangaFace.sample_curves[i].size() == 0) continue;
+	//
+	//	compare_curve_add_seed(sample_curve, mangaFace.sample_curves[i], p_i, is_c);
+	//	curve_is_visited[i] = true;
+	//}
+	//printf("1. ");
+	//
+	//remove_duplication_seed(p_i);
+	//simplify_seed(p_i);
+
 	if (seeds.size() != sampleFace.sample_curves.size() + sampleFace.sample_cycles.size())
 		seeds.resize(sampleFace.sample_curves.size() + sampleFace.sample_cycles.size());
+	if (seed_curves.size() != sampleFace.sample_curves.size() + sampleFace.sample_cycles.size())
+		seed_curves.resize(sampleFace.sample_curves.size() + sampleFace.sample_cycles.size());
 	std::vector<bool> curve_is_visited;
 	curve_is_visited.resize(mangaFace.sample_curves.size()); // all will be zero
 
 
 	for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
-		if (mangaFace.sample_curves[i].size() == 0){
-			printf("Warning: manga face curve 0 size\n");
-			continue;
-		}
+		if (mangaFace.sample_curves[i].size() == 0) continue;
 
+		std::vector<cv::Point2d> curve;
 		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]].size(); ++j){
 			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]][j];
 			if (a_crv == i || mangaFace.sample_curves[a_crv].size() == 0) continue;
+			curve.clear();
 
-			std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[a_crv], mangaFace.sample_curves[i]);
+			if (mangaFace.sample_curves[a_crv][0] == mangaFace.sample_curves[i][0])
+				std::reverse(mangaFace.sample_curves[a_crv].begin(), mangaFace.sample_curves[a_crv].end());
+			for (unsigned int k = 0; k < mangaFace.sample_curves[a_crv].size(); ++k) curve.push_back(mangaFace.sample_curves[a_crv][k]);
+			for (unsigned int k = 1; k < mangaFace.sample_curves[i].size(); ++k) curve.push_back(mangaFace.sample_curves[i][k]);
 
-			for (unsigned int k = 0; k < mangaFace.pnt_to_curve[mangaFace.sample_curves[i].back()].size(); ++k){
-				unsigned int b_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i].back()][k];
+			std::vector<cv::Point2d> curve_e;
+			for (unsigned int k = 0; k < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]].size(); ++k){
+				unsigned int b_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]][k];
 				if (b_crv == i || mangaFace.sample_curves[b_crv].size() == 0) continue;
+				curve_e = curve;
 
-				std::vector<cv::Point2d> curve_e = join_curve(curve, mangaFace.sample_curves[b_crv]);
+				if (mangaFace.sample_curves[b_crv][mangaFace.sample_curves[b_crv].size() - 1] == mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1])
+					std::reverse(mangaFace.sample_curves[b_crv].begin(), mangaFace.sample_curves[b_crv].end());
+				for (unsigned int l = 1; l < mangaFace.sample_curves[b_crv].size(); ++l) curve_e.push_back(mangaFace.sample_curves[b_crv][l]);
+
 				compare_curve_add_seed(sample_curve, curve_e, p_i, is_c);
 				curve_is_visited[a_crv] = curve_is_visited[i] = curve_is_visited[b_crv] = true;
 			}
@@ -1024,11 +1125,17 @@ void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_cu
 	for (unsigned int i = 0; i < mangaFace.sample_curves.size(); ++i){
 		if (curve_is_visited[i] || mangaFace.sample_curves[i].size() == 0) continue;
 
+		std::vector<cv::Point2d> curve;
 		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]].size(); ++j){
 			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][0]][j];
 			if (a_crv <= i || curve_is_visited[a_crv] || mangaFace.sample_curves[a_crv].size() == 0) continue;
+			curve.clear();
 
-			std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[a_crv], mangaFace.sample_curves[i]);
+			if (mangaFace.sample_curves[a_crv][0] == mangaFace.sample_curves[i][0])
+				std::reverse(mangaFace.sample_curves[a_crv].begin(), mangaFace.sample_curves[a_crv].end());
+			for (unsigned int k = 0; k < mangaFace.sample_curves[a_crv].size(); ++k) curve.push_back(mangaFace.sample_curves[a_crv][k]);
+			for (unsigned int k = 1; k < mangaFace.sample_curves[i].size(); ++k) curve.push_back(mangaFace.sample_curves[i][k]);
+
 			compare_curve_add_seed(sample_curve, curve, p_i, is_c);
 			curve_is_visited[a_crv] = curve_is_visited[i] = true;
 		}
@@ -1036,8 +1143,13 @@ void mangaShow::compare_curves_with_primitive(std::vector<cv::Point2d> sample_cu
 		for (unsigned int j = 0; j < mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]].size(); ++j){
 			unsigned int a_crv = mangaFace.pnt_to_curve[mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1]][j];
 			if (a_crv <= i || curve_is_visited[a_crv] || mangaFace.sample_curves[a_crv].size() == 0) continue;
+			curve.clear();
 
-			std::vector<cv::Point2d> curve = join_curve(mangaFace.sample_curves[i], mangaFace.sample_curves[a_crv]);
+			if (mangaFace.sample_curves[a_crv][mangaFace.sample_curves[a_crv].size() - 1] == mangaFace.sample_curves[i][mangaFace.sample_curves[i].size() - 1])
+				std::reverse(mangaFace.sample_curves[a_crv].begin(), mangaFace.sample_curves[a_crv].end());
+			for (unsigned int k = 0; k < mangaFace.sample_curves[i].size(); ++k) curve.push_back(mangaFace.sample_curves[i][k]);
+			for (unsigned int k = 1; k < mangaFace.sample_curves[a_crv].size(); ++k) curve.push_back(mangaFace.sample_curves[a_crv][k]);
+
 			compare_curve_add_seed(sample_curve, curve, p_i, is_c);
 			curve_is_visited[a_crv] = curve_is_visited[i] = true;
 		}

@@ -81,10 +81,12 @@ private:
 	typedef struct mlt{
 		std::vector<unsigned int> seeds;
 		unsigned int total_rank;
-		mlt(unsigned int n){ seeds.resize(n); total_rank = 0; }
+		double total_diff;
+		mlt(unsigned int n){ seeds.resize(n); total_rank = 0; total_diff = 0; }
 		bool operator==(mlt const &lt){ return seeds == lt.seeds; };
 	} mlt;
 	struct mlt_cmp{ bool operator()(mlt const &a, mlt const &b){ return a.total_rank < b.total_rank; }; };
+	struct mlt_diff_cmp{ bool operator()(mlt const &a, mlt const &b){ return a.total_diff < b.total_diff; }; };
 
 	int scale = 3;
 	cv::RNG rng = cv::RNG(1234);
@@ -98,6 +100,7 @@ private:
 	std::vector<CurveDescriptor> mangaFace_CD, sampleFace_CD;
 	std::vector<bool> prim_is_open;
 	std::vector<std::vector<std::vector<cv::Point2d>>> seeds;
+	std::vector<std::vector<std::vector<cv::Point2d>>> seed_curves;
 	std::vector<std::vector<mgd>> all_gd;
 	std::vector<std::vector<unsigned int>> gd_idx;
 	std::vector<std::unordered_map<unsigned int, double>> geo_score;
